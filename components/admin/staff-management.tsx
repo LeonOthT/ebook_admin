@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Eye, Edit, Trash2, UserCheck, UserX } from "lucide-react"
+import { Search, Filter, Plus, Eye, Edit, Trash2, UserCheck, UserX, X, ArrowUp, ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -23,6 +23,8 @@ export default function StaffManagement() {
   const [searchQuery, setSearchQuery] = useState("")
   const [positionFilter, setPositionFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
+  const [sortBy, setSortBy] = useState<string>("createdat")
+  const [isAscending, setIsAscending] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -65,18 +67,22 @@ export default function StaffManagement() {
 
   useEffect(() => {
     if (mounted) {
-      fetchStaffList({ pageNumber: 1, pageSize: 10 })
+      fetchStaffList({ pageNumber: 1, pageSize: 10, sortBy: "createdat" as any, isAscending: false })
     }
   }, [access_token, mounted])
 
-  const handleSearch = () => {
+  // Real-time filtering - tự động fetch khi filter thay đổi
+  useEffect(() => {
+    if (!mounted) return
+
     const params: StaffListParams = {
       pageNumber: 1,
       pageSize: 10,
+      sortBy: sortBy as any,
+      isAscending,
     }
 
     if (searchQuery.trim()) {
-      // Tìm kiếm trong cả tên và email
       params.fullName = searchQuery.trim()
     }
 
@@ -88,13 +94,29 @@ export default function StaffManagement() {
       params.isActive = statusFilter === "active"
     }
 
-    fetchStaffList(params)
+    // Debounce cho search text để tránh quá nhiều API calls
+    const timeoutId = setTimeout(() => {
+      fetchStaffList(params)
+    }, searchQuery.trim() ? 500 : 0) // 500ms debounce cho search, ngay lập tức cho dropdown
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, positionFilter, statusFilter, sortBy, isAscending, mounted])
+
+  const handleResetFilters = () => {
+    setSearchQuery("")
+    setPositionFilter("")
+    setStatusFilter("")
+    setSortBy("createdat")
+    setIsAscending(false)
+    // fetchStaffList sẽ tự động được gọi qua useEffect
   }
 
   const handlePageChange = (newPage: number) => {
     const params: StaffListParams = {
       pageNumber: newPage,
       pageSize: 10,
+      sortBy: sortBy as any,
+      isAscending,
     }
 
     if (searchQuery.trim()) {
@@ -140,14 +162,14 @@ export default function StaffManagement() {
 
       {/* Bộ lọc và tìm kiếm */}
       <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Tìm kiếm theo tên hoặc email..."
             className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+            onKeyPress={(e) => e.key === "Enter" && e.currentTarget.blur()}
           />
         </div>
 
@@ -156,10 +178,9 @@ export default function StaffManagement() {
             <SimpleSelect
               value={positionFilter}
               onValueChange={setPositionFilter}
-              placeholder="Lọc theo chức vụ"
-              className="w-[180px]"
+              placeholder="Chức vụ"
+              className="w-[120px]"
               options={[
-                { value: "", label: "Tất cả chức vụ" },
                 { value: "1", label: "Administrator" },
                 { value: "2", label: "Staff" },
                 { value: "3", label: "User Manager" },
@@ -171,19 +192,38 @@ export default function StaffManagement() {
               value={statusFilter}
               onValueChange={setStatusFilter}
               placeholder="Trạng thái"
-              className="w-[140px]"
+              className="w-[110px]"
               options={[
-                { value: "", label: "Tất cả" },
                 { value: "active", label: "Hoạt động" },
-                { value: "inactive", label: "Không hoạt động" }
+                { value: "inactive", label: "Tạm khóa" }
+              ]}
+            />
+
+            <SimpleSelect
+              value={`${sortBy}-${isAscending ? 'asc' : 'desc'}`}
+              onValueChange={(value) => {
+                const [field, direction] = value.split('-')
+                setSortBy(field)
+                setIsAscending(direction === 'asc')
+              }}
+              placeholder="Sắp xếp"
+              className="w-[120px]"
+              options={[
+                { value: "fullname-asc", label: "Tên A→Z" },
+                { value: "fullname-desc", label: "Tên Z→A" },
+                { value: "email-asc", label: "Email A→Z" },
+                { value: "email-desc", label: "Email Z→A" },
+                { value: "createdat-desc", label: "Mới nhất" },
+                { value: "createdat-asc", label: "Cũ nhất" },
+                { value: "position-asc", label: "Chức vụ A→Z" },
+                { value: "position-desc", label: "Chức vụ Z→A" }
               ]}
             />
           </>
         )}
 
-        <Button onClick={handleSearch} disabled={isLoading}>
-          <Filter className="mr-2 h-4 w-4" />
-          Lọc
+        <Button onClick={handleResetFilters} disabled={isLoading} variant="outline" size="sm">
+          Đặt lại
         </Button>
       </div>
 

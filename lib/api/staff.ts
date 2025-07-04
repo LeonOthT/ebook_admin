@@ -1,4 +1,4 @@
-const API_BASE = "https://booklify-api-fhhjg3asgwhxgfhd.southeastasia-01.azurewebsites.net/api/cms"
+import { getApiUrl, config, devLog } from "@/lib/config"
 
 export interface CreateStaffRequest {
   first_name: string
@@ -72,7 +72,10 @@ export const staffApi = {
     searchParams.append('pageNumber', (params.pageNumber || 1).toString())
     searchParams.append('pageSize', (params.pageSize || 10).toString())
 
-    const response = await fetch(`${API_BASE}/staff/list?${searchParams.toString()}`, {
+    const url = getApiUrl(`${config.api.staff.list}?${searchParams.toString()}`)
+    devLog("Staff list API request URL:", url)
+    
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -90,7 +93,7 @@ export const staffApi = {
 
   // Tạo nhân viên mới
   create: async (data: CreateStaffRequest, token: string) => {
-    const response = await fetch(`${API_BASE}/staff`, {
+    const response = await fetch(getApiUrl(config.api.staff.create), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

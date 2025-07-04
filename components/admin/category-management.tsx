@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Eye, Edit, Trash2, FolderPlus } from "lucide-react"
+import { Search, Filter, Plus, Eye, Edit, Trash2, FolderPlus, X, ArrowUp, ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,7 +20,6 @@ export default function CategoryManagement() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [descriptionFilter, setDescriptionFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [sortBy, setSortBy] = useState<string>("createdat")
   const [isAscending, setIsAscending] = useState(false)
@@ -70,7 +69,10 @@ export default function CategoryManagement() {
     }
   }, [access_token, mounted])
 
-  const handleSearch = () => {
+  // Real-time filtering - tự động fetch khi filter thay đổi
+  useEffect(() => {
+    if (!mounted) return
+
     const params: CategoryListParams = {
       pageNumber: 1,
       pageSize: 10,
@@ -82,40 +84,29 @@ export default function CategoryManagement() {
       params.name = searchQuery.trim()
     }
 
-    if (descriptionFilter.trim()) {
-      params.description = descriptionFilter.trim()
-    }
-
     if (statusFilter) {
       params.status = statusFilter === "active" ? 1 : 0
     }
 
-    fetchCategoryList(params)
+    // Debounce cho search text để tránh quá nhiều API calls
+    const timeoutId = setTimeout(() => {
+      fetchCategoryList(params)
+    }, searchQuery.trim() ? 500 : 0) // 500ms debounce cho search, ngay lập tức cho dropdown
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, statusFilter, sortBy, isAscending, mounted])
+
+  const handleResetFilters = () => {
+    setSearchQuery("")
+    setStatusFilter("")
+    setSortBy("createdat")
+    setIsAscending(false)
+    // fetchCategoryList sẽ tự động được gọi qua useEffect
   }
 
   const handleSortChange = (field: string) => {
-    const params: CategoryListParams = {
-      pageNumber: 1,
-      pageSize: 10,
-      sortBy: field as any,
-      isAscending: sortBy === field ? !isAscending : true,
-    }
-
-    if (searchQuery.trim()) {
-      params.name = searchQuery.trim()
-    }
-
-    if (descriptionFilter.trim()) {
-      params.description = descriptionFilter.trim()
-    }
-
-    if (statusFilter) {
-      params.status = statusFilter === "active" ? 1 : 0
-    }
-
     setSortBy(field)
     setIsAscending(sortBy === field ? !isAscending : true)
-    fetchCategoryList(params)
   }
 
   const handlePageChange = (newPage: number) => {
@@ -128,10 +119,6 @@ export default function CategoryManagement() {
 
     if (searchQuery.trim()) {
       params.name = searchQuery.trim()
-    }
-
-    if (descriptionFilter.trim()) {
-      params.description = descriptionFilter.trim()
     }
 
     if (statusFilter) {
@@ -168,23 +155,14 @@ export default function CategoryManagement() {
       {/* Bộ lọc và tìm kiếm */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Tìm kiếm theo tên danh mục..."
               className="pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-            />
-          </div>
-
-          <div className="relative flex-1 max-w-sm">
-            <Input
-              placeholder="Tìm kiếm theo mô tả..."
-              value={descriptionFilter}
-              onChange={(e) => setDescriptionFilter(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+              onKeyPress={(e) => e.key === "Enter" && e.currentTarget.blur()}
             />
           </div>
 
@@ -194,36 +172,37 @@ export default function CategoryManagement() {
                 value={statusFilter}
                 onValueChange={setStatusFilter}
                 placeholder="Trạng thái"
-                className="w-[140px]"
+                className="w-[110px]"
                 options={[
-                  { value: "", label: "Tất cả" },
                   { value: "active", label: "Hoạt động" },
-                  { value: "inactive", label: "Không hoạt động" }
+                  { value: "inactive", label: "Tạm khóa" }
                 ]}
               />
 
               <SimpleSelect
-                value={sortBy}
+                value={`${sortBy}-${isAscending ? 'asc' : 'desc'}`}
                 onValueChange={(value) => {
-                  setSortBy(value)
-                  handleSortChange(value)
+                  const [field, direction] = value.split('-')
+                  setSortBy(field)
+                  setIsAscending(direction === 'asc')
+                  handleSortChange(field)
                 }}
-                placeholder="Sắp xếp theo"
-                className="w-[160px]"
+                placeholder="Sắp xếp"
+                className="w-[120px]"
                 options={[
-                  { value: "name", label: "Tên" },
-                  { value: "description", label: "Mô tả" },
-                  { value: "status", label: "Trạng thái" },
-                  { value: "createdat", label: "Ngày tạo" },
-                  { value: "bookscount", label: "Số sách" }
+                  { value: "name-asc", label: "Tên A→Z" },
+                  { value: "name-desc", label: "Tên Z→A" },
+                  { value: "createdat-desc", label: "Mới nhất" },
+                  { value: "createdat-asc", label: "Cũ nhất" },
+                  { value: "bookscount-desc", label: "Nhiều sách" },
+                  { value: "bookscount-asc", label: "Ít sách" }
                 ]}
               />
             </>
           )}
 
-          <Button onClick={handleSearch} disabled={isLoading}>
-            <Filter className="mr-2 h-4 w-4" />
-            Lọc
+          <Button onClick={handleResetFilters} disabled={isLoading} variant="outline" size="sm">
+            Đặt lại
           </Button>
         </div>
       </div>
