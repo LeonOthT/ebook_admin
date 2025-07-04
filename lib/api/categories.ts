@@ -1,4 +1,5 @@
-const API_BASE = "https://booklify-api-fhhjg3asgwhxgfhd.southeastasia-01.azurewebsites.net/api/cms"
+import { getApiUrl, config, devLog } from "@/lib/config"
+import { referenceApi, type DropdownOption } from "./reference"
 
 export interface BookCategory {
   id: string
@@ -37,7 +38,7 @@ export interface CategoryListResponse {
 export const categoriesApi = {
   // Tạo danh mục sách mới
   create: async (data: CreateCategoryRequest, token: string): Promise<BookCategory> => {
-    const response = await fetch(`${API_BASE}/book-categories`, {
+    const response = await fetch(getApiUrl(config.api.categories.create), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -66,7 +67,8 @@ export const categoriesApi = {
     if (params.pageNumber) searchParams.append("pageNumber", params.pageNumber.toString())
     if (params.pageSize) searchParams.append("pageSize", params.pageSize.toString())
 
-    const url = `${API_BASE}/book-categories/list${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+    const url = getApiUrl(`${config.api.categories.list}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`)
+    devLog("Categories list API request URL:", url)
     
     const response = await fetch(url, {
       headers: {
@@ -92,7 +94,7 @@ export const categoriesApi = {
 
   // Lấy danh sách danh mục (phương thức cũ - giữ để tương thích)
   getAll: async (token: string): Promise<BookCategory[]> => {
-    const response = await fetch(`${API_BASE}/book-categories`, {
+    const response = await fetch(getApiUrl(config.api.categories.getAll), {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -104,5 +106,10 @@ export const categoriesApi = {
     }
 
     return result.data
+  },
+
+  // Lấy danh sách categories cho dropdown (sử dụng reference API)
+  getForDropdown: async (): Promise<DropdownOption[]> => {
+    return await referenceApi.getBookCategories()
   },
 }

@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
+import { getApiUrl, config, devLog } from "@/lib/config"
 
 export interface User {
   username: string
@@ -28,17 +29,17 @@ const initialState: AuthState = {
 type Credentials = { email: string; password: string }
 
 async function loginRequest(body: Record<string, string>) {
-  const res = await fetch(
-    "https://booklify-api-fhhjg3asgwhxgfhd.southeastasia-01.azurewebsites.net/api/cms/auth/login",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(body),
+  const url = getApiUrl(config.api.auth.login)
+  devLog("Login request URL:", url)
+  
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
-  )
+    body: JSON.stringify(body),
+  })
 
   const text = await res.text()
   let data
@@ -70,11 +71,11 @@ async function smartLogin({ email, password }: Credentials) {
   let lastError: Error | null = null
   for (const body of variants) {
     try {
-      console.log("Trying login with:", Object.keys(body))
+      devLog("Trying login with:", Object.keys(body))
       return await loginRequest(body)
     } catch (err: any) {
       lastError = err
-      console.warn("Login variant failed:", Object.keys(body), err.message)
+      devLog("Login variant failed:", `${Object.keys(body).join(', ')} - ${err.message}`)
       // Nếu lỗi là validation/thiếu trường ⇒ thử biến thể tiếp theo
       if (/validation|thiếu trường/i.test(err.message)) continue
       // Nếu lỗi khác (DB error/sai mật khẩu) ⇒ dừng hẳn
@@ -92,7 +93,7 @@ export const loginUser = createAsyncThunk("auth/loginUser", async (credentials: 
     localStorage.setItem("user", JSON.stringify(data))
     return data
   } catch (error: any) {
-    console.error("Login error:", error)
+    devLog("Login error:", error.message)
     if (error.name === "TypeError" && error.message.includes("fetch")) {
       return rejectWithValue("Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.")
     }
@@ -146,7 +147,7 @@ const authSlice = createSlice({
         state.error = null
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        console.log("Login fulfilled, setting authentication state...")
+        devLog("Login fulfilled, setting authentication state...")
         state.isLoading = false
         state.user = {
           username: action.payload.username,
@@ -157,7 +158,7 @@ const authSlice = createSlice({
         state.access_token = action.payload.access_token
         state.token_expires_in = action.payload.token_expires_in
         state.isAuthenticated = true
-        console.log("Authentication state updated:", { isAuthenticated: state.isAuthenticated, user: state.user?.username })
+        devLog("Authentication state updated:", { isAuthenticated: state.isAuthenticated, user: state.user?.username })
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false

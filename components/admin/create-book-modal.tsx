@@ -23,7 +23,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { booksApi, type CreateBookRequest } from "@/lib/api/books"
-import { categoriesApi, type BookCategory } from "@/lib/api/categories"
+import { useBookCategories } from "@/hooks/use-reference-data"
+import { devLog } from "@/lib/config"
+
 
 interface CreateBookModalProps {
   onSuccess?: () => void
@@ -33,7 +35,6 @@ export default function CreateBookModal({ onSuccess }: CreateBookModalProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [categories, setCategories] = useState<BookCategory[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [formData, setFormData] = useState({
     title: "",
@@ -47,46 +48,85 @@ export default function CreateBookModal({ onSuccess }: CreateBookModalProps) {
     published_date: "",
   })
 
-  const { access_token } = useAppSelector((state) => state.auth)
+  // Sử dụng hook với lazy loading để tránh load categories khi không cần (autoLoad = false)
+  const { categories, isLoading: categoriesLoading, error: categoriesError, hasLoaded, loadCategories } = useBookCategories(false)
+
+  const { access_token, user } = useAppSelector((state) => state.auth)
   const { toast } = useToast()
 
-  console.log("CreateBookModal rendered, open:", open)
+  // Check if user is Admin (có quyền chỉnh sửa premium)
+  const isAdmin = user?.app_role?.includes('Admin') || false
+  devLog("User role check:", { roles: user?.app_role, isAdmin })
+
+  devLog("CreateBookModal rendered, open:", open)
+  devLog("Categories available:", categories.length)
+  devLog("Categories loading:", categoriesLoading)
+  devLog("Categories has loaded:", hasLoaded)
+
+  // Debug: Log categories mỗi khi thay đổi
+  useEffect(() => {
+    devLog("Categories changed:", { count: categories.length, categories })
+  }, [categories])
+
+  // Hiển thị lỗi categories nếu có
+  useEffect(() => {
+    if (categoriesError) {
+      devLog("Categories error:", categoriesError)
+      toast({
+        title: "Lỗi!",
+        description: categoriesError,
+        variant: "destructive",
+      })
+    }
+  }, [categoriesError, toast])
 
   const handleOpenChange = (newOpen: boolean) => {
-    console.log("Book Dialog open change:", newOpen)
+    devLog("Book Dialog open change:", newOpen)
     setOpen(newOpen)
     if (!newOpen) {
       resetForm()
     }
+    // Không cần load categories nữa vì đã có global cache từ Book Management
+    if (newOpen) {
+      devLog("Modal opened, categories from global cache:", { count: categories.length, hasLoaded })
+    }
   }
 
   const handleButtonClick = () => {
-    console.log("Book Button clicked!")
+    devLog("Book Button clicked!")
     setOpen(true)
+    // Không cần load categories nữa vì đã có global cache từ Book Management
   }
 
-  // Load categories khi mở modal
-  useEffect(() => {
-    if (open && access_token) {
-      console.log("Loading categories...")
-      loadCategories()
-    }
-  }, [open, access_token])
+  // Load categories khi mở modal - KHÔNG CẦN NỮA vì đã dùng useBookCategories hook
+  // useEffect(() => {
+  //   if (open) {
+  //     devLog("Loading categories...")
+  //     loadCategories()
+  //   }
+  // }, [open])
 
-  const loadCategories = async () => {
-    try {
-      const response = await categoriesApi.getList({}, access_token!)
-      console.log("Categories loaded:", response.data)
-      setCategories(response.data)
-    } catch (err) {
-      console.error("Failed to load categories:", err)
-      setError("Không thể tải danh sách danh mục")
-    }
-  }
+  // const loadCategories = async () => {
+  //   try {
+  //     const options = await categoriesApi.getForDropdown()
+  //     devLog("Categories loaded:", options.length)
+  //     setCategories(options)
+  //   } catch (err: any) {
+  //     devLog("Failed to load categories:", err.message)
+  //     setError("Không thể tải danh sách danh mục")
+
+  //     // Show error toast
+  //     toast({
+  //       title: "Lỗi!",
+  //       description: "Không thể tải danh sách danh mục",
+  //       variant: "destructive",
+  //     })
+  //   }
+  // }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    console.log("File selected:", file?.name)
+    devLog("File selected:", file?.name)
 
     if (file) {
       // Kiểm tra định dạng file
@@ -94,29 +134,47 @@ export default function CreateBookModal({ onSuccess }: CreateBookModalProps) {
       const fileExtension = "." + file.name.split(".").pop()?.toLowerCase()
 
       if (!allowedTypes.includes(fileExtension)) {
-        setError("Chỉ hỗ trợ file PDF, EPUB, DOCX, TXT")
+        const errorMsg = "Chỉ hỗ trợ file PDF, EPUB, DOCX, TXT"
+        setError(errorMsg)
+        toast({
+          title: "Lỗi!",
+          description: errorMsg,
+          variant: "destructive",
+        })
         return
       }
 
       // Kiểm tra kích thước file (50MB)
       if (file.size > 50 * 1024 * 1024) {
-        setError("Kích thước file không được vượt quá 50MB")
+        const errorMsg = "Kích thước file không được vượt quá 50MB"
+        setError(errorMsg)
+        toast({
+          title: "Lỗi!",
+          description: errorMsg,
+          variant: "destructive",
+        })
         return
       }
 
       setSelectedFile(file)
       setError(null)
+      devLog("File selected successfully:", { name: file.name, size: `${(file.size / (1024 * 1024)).toFixed(2)}MB` })
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Book Form submitted")
-    console.log("Form data:", formData)
-    console.log("Selected file:", selectedFile?.name)
+    devLog("Book Form submitted")
+    devLog("Form data:", formData)
+    devLog("Selected file:", selectedFile?.name)
 
     if (!access_token || !selectedFile) {
-      console.log("Missing token or file")
+      devLog("Missing token or file")
+      toast({
+        title: "Lỗi!",
+        description: "Thiếu thông tin xác thực hoặc file sách",
+        variant: "destructive",
+      })
       return
     }
 
@@ -132,14 +190,21 @@ export default function CreateBookModal({ onSuccess }: CreateBookModalProps) {
         description: formData.description || undefined,
         isbn: formData.isbn || undefined,
         publisher: formData.publisher || undefined,
-        is_premium: formData.is_premium,
+        is_premium: isAdmin ? formData.is_premium : false, // Staff always sends false
         tags: formData.tags || undefined,
         published_date: formData.published_date || undefined,
       }
 
-      console.log("Sending request:", requestData)
+      devLog("Sending request:", {
+        title: requestData.title,
+        author: requestData.author,
+        category_id: requestData.category_id,
+        is_premium: requestData.is_premium,
+        userRole: user?.app_role,
+        isAdmin
+      })
       const result = await booksApi.create(requestData, access_token)
-      console.log("Book created successfully:", result)
+      devLog("Book created successfully:", result)
 
       // Show success toast
       toast({
@@ -152,15 +217,15 @@ export default function CreateBookModal({ onSuccess }: CreateBookModalProps) {
       resetForm()
       onSuccess?.()
     } catch (err: any) {
-      console.error("Book creation error:", err)
-      
+      devLog("Book creation error:", err.message)
+
       // Show error toast
       toast({
         title: "Lỗi!",
         description: err.message || "Có lỗi xảy ra khi tạo sách.",
         variant: "destructive",
       })
-      
+
       setError(err.message)
     } finally {
       setIsLoading(false)
@@ -274,13 +339,20 @@ export default function CreateBookModal({ onSuccess }: CreateBookModalProps) {
               <SimpleSelect
                 value={formData.category_id}
                 onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-                placeholder="Chọn danh mục"
-                disabled={isLoading}
-                options={categories.map((category) => ({
-                  value: category.id,
-                  label: category.name
-                }))}
+                placeholder={
+                  categoriesLoading ? "Đang tải danh mục..." :
+                    categories.length === 0 && hasLoaded ? "Không có danh mục" :
+                      "Chọn danh mục"
+                }
+                disabled={isLoading || categoriesLoading}
+                options={categories}
               />
+              {categoriesError && (
+                <p className="text-sm text-red-500">Lỗi: {categoriesError}</p>
+              )}
+              {hasLoaded && categories.length === 0 && !categoriesError && (
+                <p className="text-sm text-yellow-600">Không có danh mục khả dụng</p>
+              )}
             </div>
 
             {/* Description */}
@@ -344,16 +416,18 @@ export default function CreateBookModal({ onSuccess }: CreateBookModalProps) {
               />
             </div>
 
-            {/* Premium Switch */}
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_premium"
-                checked={formData.is_premium}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_premium: checked })}
-                disabled={isLoading}
-              />
-              <Label htmlFor="is_premium">Sách Premium (có phí)</Label>
-            </div>
+            {/* Premium Switch - Only visible for Admin */}
+            {isAdmin && (
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="is_premium"
+                  checked={formData.is_premium}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_premium: checked })}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="is_premium">Sách Premium (có phí)</Label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
