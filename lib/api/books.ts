@@ -2,18 +2,14 @@ import { getApiUrl, config, devLog } from "@/lib/config"
 
 export interface CreateBookRequest {
   file: File
-  title: string
-  description?: string
-  author: string
-  isbn?: string
-  publisher?: string
   category_id: string
   is_premium?: boolean
   tags?: string
-  published_date?: string
+  isbn?: string
 }
 
 export interface BookStatusRequest {
+  status?: 0 | 1 // 0: Inactive, 1: Active
   approval_status?: 0 | 1 | 2 // 0: Pending, 1: Approved, 2: Rejected
   approval_note?: string
   is_premium?: boolean
@@ -24,20 +20,72 @@ export interface Book {
   title: string
   author: string
   description: string
-  isbn?: string
-  publisher?: string
+  category_id: string
   category_name: string
-  cover_image_url: string
   approval_status: 0 | 1 | 2 // 0: Pending, 1: Approved, 2: Rejected
-  status: 0 | 1 // 0: Active, 1: Inactive
+  approval_status_string: string // String representation
+  status: 0 | 1 // 0: Inactive, 1: Active
+  status_string: string // String representation
+  cover_image_url: string
   is_premium: boolean
-  has_chapters: boolean
   average_rating: number
   total_ratings: number
   total_views: number
   published_date: string
   created_at: string
+}
+
+export interface BookDetail extends Book {
+  isbn?: string
+  publisher?: string
+  status: 0 | 1 // 0: Inactive, 1: Active
+  status_string: string // String representation
+  has_chapters: boolean
   tags?: string
+  file_path?: string
+  file_url?: string
+  page_count: number
+  modified_at: string
+  approval_note?: string
+}
+
+export interface BookDetailResponse {
+  id: string
+  title: string
+  author: string
+  description: string
+  category_id: string
+  category_name: string
+  approval_status: 0 | 1 | 2 // 0: Pending, 1: Approved, 2: Rejected
+  approval_status_string: string // String representation
+  cover_image_url: string
+  is_premium: boolean
+  average_rating: number
+  total_ratings: number
+  total_views: number
+  published_date: string
+  created_at: string
+  isbn?: string
+  publisher?: string
+  status: 0 | 1 // 0: Inactive, 1: Active
+  status_string: string // String representation
+  has_chapters: boolean
+  tags?: string
+  file_path?: string
+  file_url?: string
+  page_count: number
+  modified_at: string
+  approval_note?: string
+}
+
+export interface ChapterResponse {
+  id: string
+  title: string
+  order: number
+  href?: string
+  cfi?: string
+  parent_chapter_id?: string
+  child_chapters?: ChapterResponse[]
 }
 
 export interface BookListParams {
@@ -81,21 +129,16 @@ export interface BookListResponse {
 }
 
 export const booksApi = {
-  // Tạo sách mới
+  // Tạo sách mới từ EPUB
   create: async (data: CreateBookRequest, token: string) => {
     const formData = new FormData()
 
     formData.append("file", data.file)
-    formData.append("title", data.title)
-    formData.append("author", data.author)
     formData.append("category_id", data.category_id)
 
-    if (data.description) formData.append("description", data.description)
-    if (data.isbn) formData.append("isbn", data.isbn)
-    if (data.publisher) formData.append("publisher", data.publisher)
     if (data.is_premium !== undefined) formData.append("is_premium", data.is_premium.toString())
     if (data.tags) formData.append("tags", data.tags)
-    if (data.published_date) formData.append("published_date", data.published_date)
+    if (data.isbn) formData.append("isbn", data.isbn)
 
     const response = await fetch(getApiUrl(config.api.books.create), {
       method: "POST",
@@ -113,6 +156,24 @@ export const booksApi = {
     return result.data
   },
 
+  // Cập nhật sách
+  update: async (bookId: string, updateData: FormData, token: string) => {
+    const response = await fetch(getApiUrl(config.api.books.update(bookId)), {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: updateData,
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Cập nhật sách thất bại")
+    }
+
+    return result.data
+  },
+
   // Cập nhật trạng thái sách (chỉ Admin)
   updateStatus: async (bookId: string, data: BookStatusRequest, token: string) => {
     const response = await fetch(getApiUrl(config.api.books.updateStatus(bookId)), {
@@ -124,8 +185,13 @@ export const booksApi = {
       body: JSON.stringify(data),
     })
 
+    if (!response.ok) {
+      const result = await response.json()
+      throw new Error(result.message || "Cập nhật trạng thái sách thất bại")
+    }
+
     const result = await response.json()
-    if (!response.ok || result.result !== "success") {
+    if (result.result !== "success") {
       throw new Error(result.message || "Cập nhật trạng thái sách thất bại")
     }
 
@@ -177,5 +243,54 @@ export const booksApi = {
       hasPreviousPage: result.data.hasPreviousPage,
       hasNextPage: result.data.hasNextPage,
     }
+  },
+
+  // Lấy thông tin chi tiết sách (không có chapters)
+  getDetail: async (bookId: string, token: string): Promise<BookDetailResponse> => {
+    const response = await fetch(getApiUrl(config.api.books.getDetail(bookId)), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy thông tin sách thất bại")
+    }
+
+    return result.data
+  },
+
+  // Lấy danh sách chapters của sách
+  getChapters: async (bookId: string, token: string): Promise<ChapterResponse[]> => {
+    const response = await fetch(getApiUrl(config.api.books.getChapters(bookId)), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy danh sách chapters thất bại")
+    }
+
+    return result.data
+  },
+
+  // Xóa sách (chỉ Admin)
+  delete: async (bookId: string, token: string) => {
+    const response = await fetch(getApiUrl(config.api.books.delete(bookId)), {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Xóa sách thất bại")
+    }
+
+    return result.data
   },
 }

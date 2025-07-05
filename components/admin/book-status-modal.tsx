@@ -26,7 +26,8 @@ import { booksApi, type BookStatusRequest } from "@/lib/api/books"
 interface BookStatusModalProps {
   bookId: string
   bookTitle: string
-  currentStatus?: number
+  currentBookStatus?: number // 0: Inactive, 1: Active
+  currentApprovalStatus?: number // 0: Pending, 1: Approved, 2: Rejected
   currentPremium?: boolean
   onSuccess?: () => void
   children: React.ReactNode
@@ -35,7 +36,8 @@ interface BookStatusModalProps {
 export default function BookStatusModal({
   bookId,
   bookTitle,
-  currentStatus,
+  currentBookStatus,
+  currentApprovalStatus,
   currentPremium,
   onSuccess,
   children,
@@ -44,7 +46,8 @@ export default function BookStatusModal({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<BookStatusRequest>({
-    approval_status: currentStatus as 0 | 1 | 2,
+    status: currentBookStatus as 0 | 1,
+    approval_status: currentApprovalStatus as 0 | 1 | 2,
     approval_note: "",
     is_premium: currentPremium,
   })
@@ -61,7 +64,8 @@ export default function BookStatusModal({
     if (!newOpen) {
       setError(null)
       setFormData({
-        approval_status: currentStatus as 0 | 1 | 2,
+        status: currentBookStatus as 0 | 1,
+        approval_status: currentApprovalStatus as 0 | 1 | 2,
         approval_note: "",
         is_premium: currentPremium,
       })
@@ -174,6 +178,22 @@ export default function BookStatusModal({
             </div>
 
             <div className="grid gap-2">
+              <Label htmlFor="book_status">Trạng thái sách</Label>
+              <SimpleSelect
+                value={formData.status?.toString() || ""}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, status: Number.parseInt(value) as 0 | 1 })
+                }
+                placeholder="Chọn trạng thái"
+                disabled={isLoading || !isAdmin}
+                options={[
+                  { value: "1", label: "🟢 Hoạt động" },
+                  { value: "0", label: "🔴 Không hoạt động" }
+                ]}
+              />
+            </div>
+
+            <div className="grid gap-2">
               <Label htmlFor="approval_note">
                 Ghi chú phê duyệt {formData.approval_status === 2 && <span className="text-red-500">*</span>}
               </Label>
@@ -207,7 +227,10 @@ export default function BookStatusModal({
               <h4 className="font-medium mb-2">Trạng thái hiện tại:</h4>
               <div className="text-sm space-y-1">
                 <p>
-                  <span className="font-medium">Phê duyệt:</span> {getStatusText(currentStatus || 0)}
+                  <span className="font-medium">Sách:</span> {currentBookStatus === 1 ? "🟢 Hoạt động" : "🔴 Không hoạt động"}
+                </p>
+                <p>
+                  <span className="font-medium">Phê duyệt:</span> {getStatusText(currentApprovalStatus || 0)}
                 </p>
                 <p>
                   <span className="font-medium">Premium:</span> {currentPremium ? "Có" : "Không"}
@@ -242,13 +265,15 @@ export default function BookStatusModal({
 export function BookStatusTrigger({
   bookId,
   bookTitle,
-  currentStatus,
+  currentBookStatus,
+  currentApprovalStatus,
   currentPremium,
   onSuccess,
 }: {
   bookId: string
   bookTitle: string
-  currentStatus?: number
+  currentBookStatus?: number
+  currentApprovalStatus?: number
   currentPremium?: boolean
   onSuccess?: () => void
 }) {
@@ -260,7 +285,8 @@ export function BookStatusTrigger({
     <BookStatusModal
       bookId={bookId}
       bookTitle={bookTitle}
-      currentStatus={currentStatus}
+      currentBookStatus={currentBookStatus}
+      currentApprovalStatus={currentApprovalStatus}
       currentPremium={currentPremium}
       onSuccess={onSuccess}
     >

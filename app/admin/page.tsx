@@ -48,13 +48,12 @@ import { useRouter } from "next/navigation"
 import CreateCategoryModal from "@/components/admin/create-category-modal"
 import CreateBookModal from "@/components/admin/create-book-modal"
 import CreateStaffModal from "@/components/admin/create-staff-modal"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { BookStatusTrigger } from "@/components/admin/book-status-modal"
 import StaffManagement from "@/components/admin/staff-management"
 import CategoryManagement from "@/components/admin/category-management"
 import BookManagement from "@/components/admin/book-management"
 
-// Import TestModal
-import TestModal from "@/components/test-modal"
 
 const sidebarItems = [
   { id: "dashboard", label: "Tổng quan hệ thống", icon: BarChart3, roles: ["Admin"] },
@@ -1139,7 +1138,7 @@ function AdminDashboard() {
                           <BookStatusTrigger
                             bookId={book.id.toString()}
                             bookTitle={book.title}
-                            currentStatus={book.approval_status}
+                            currentBookStatus={book.approval_status}
                             currentPremium={book.is_premium}
                             onSuccess={() => console.log("Book status updated")}
                           />
@@ -1248,6 +1247,7 @@ function AdminDashboard() {
               <Button variant="ghost" size="icon">
                 <Bell className="h-4 w-4" />
               </Button>
+              <ThemeToggle />
               <Separator orientation="vertical" className="h-6" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
