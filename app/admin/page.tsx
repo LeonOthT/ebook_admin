@@ -38,7 +38,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import AuthGuard from "@/components/auth/auth-guard"
 import { useAppDispatch, useAppSelector } from "@/lib/hooks"
 import { logout } from "@/lib/features/auth/authSlice"
@@ -1211,6 +1211,10 @@ function AdminDashboard() {
       {/* Mobile Sidebar */}
       <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-80">
+          <div className="sr-only">
+            <SheetTitle>Navigation Menu</SheetTitle>
+            <SheetDescription>Main navigation menu for the admin panel</SheetDescription>
+          </div>
           <Sidebar />
         </SheetContent>
       </Sheet>
