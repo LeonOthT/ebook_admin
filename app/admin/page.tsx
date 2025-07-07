@@ -38,7 +38,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import AuthGuard from "@/components/auth/auth-guard"
 import { useAppDispatch, useAppSelector } from "@/lib/hooks"
 import { logout } from "@/lib/features/auth/authSlice"
@@ -48,13 +48,12 @@ import { useRouter } from "next/navigation"
 import CreateCategoryModal from "@/components/admin/create-category-modal"
 import CreateBookModal from "@/components/admin/create-book-modal"
 import CreateStaffModal from "@/components/admin/create-staff-modal"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { BookStatusTrigger } from "@/components/admin/book-status-modal"
 import StaffManagement from "@/components/admin/staff-management"
 import CategoryManagement from "@/components/admin/category-management"
 import BookManagement from "@/components/admin/book-management"
 
-// Import TestModal
-import TestModal from "@/components/test-modal"
 
 const sidebarItems = [
   { id: "dashboard", label: "Tổng quan hệ thống", icon: BarChart3, roles: ["Admin"] },
@@ -1139,7 +1138,7 @@ function AdminDashboard() {
                           <BookStatusTrigger
                             bookId={book.id.toString()}
                             bookTitle={book.title}
-                            currentStatus={book.approval_status}
+                            currentBookStatus={book.approval_status}
                             currentPremium={book.is_premium}
                             onSuccess={() => console.log("Book status updated")}
                           />
@@ -1212,6 +1211,10 @@ function AdminDashboard() {
       {/* Mobile Sidebar */}
       <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-80">
+          <div className="sr-only">
+            <SheetTitle>Navigation Menu</SheetTitle>
+            <SheetDescription>Main navigation menu for the admin panel</SheetDescription>
+          </div>
           <Sidebar />
         </SheetContent>
       </Sheet>
@@ -1248,6 +1251,7 @@ function AdminDashboard() {
               <Button variant="ghost" size="icon">
                 <Bell className="h-4 w-4" />
               </Button>
+              <ThemeToggle />
               <Separator orientation="vertical" className="h-6" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

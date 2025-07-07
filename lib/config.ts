@@ -1,8 +1,8 @@
 // Cấu hình môi trường cho ứng dụng
 export const config = {
   // API Base URLs
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api/cms',
-  referenceApiBaseUrl: process.env.NEXT_PUBLIC_REFERENCE_API_BASE_URL || 'http://localhost:3000/api/common/reference',
+  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7001/api/cms',
+  referenceApiBaseUrl: process.env.NEXT_PUBLIC_REFERENCE_API_BASE_URL || 'http://localhost:7001/api/common/reference',
   
   // API Endpoints
   api: {
@@ -16,7 +16,11 @@ export const config = {
     books: {
       list: '/books/list',
       create: '/books',
+      update: (bookId: string) => `/books/${bookId}`,
       updateStatus: (bookId: string) => `/books/${bookId}/manage-status`,
+      getDetail: (bookId: string) => `/books/${bookId}`,
+      getChapters: (bookId: string) => `/books/${bookId}/chapters`,
+      delete: (bookId: string) => `/books/${bookId}`,
     },
     categories: {
       list: '/book-categories/list',
