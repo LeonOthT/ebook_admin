@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { categoriesApi, type CreateCategoryRequest } from "@/lib/api/categories"
 
@@ -59,7 +59,7 @@ export default function CreateCategoryModal({ onSuccess }: CreateCategoryModalPr
     setError(null)
 
     try {
-      await categoriesApi.create(formData, access_token)
+      await categoriesApi.create(formData)
       
       // Show success toast
       toast({

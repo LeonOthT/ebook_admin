@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SimpleSelect } from "@/components/ui/simple-select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { staffApi, type Staff, type StaffListParams } from "@/lib/api/staff"
 import CreateStaffModal from "./create-staff-modal"
@@ -44,7 +44,7 @@ export default function StaffManagement() {
     setError(null)
 
     try {
-      const response = await staffApi.getList(params, access_token)
+      const response = await staffApi.getList(params)
       setStaffList(response.data)
       setTotalPages(response.totalPages)
       setTotalCount(response.totalCount)

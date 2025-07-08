@@ -20,4 +20,4 @@ export function useTheme() {
     isDark: mounted ? currentTheme === "dark" : false,
     isLight: mounted ? currentTheme === "light" : false,
   }
-}
+} 

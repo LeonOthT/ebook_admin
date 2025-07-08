@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SimpleSelect } from "@/components/ui/simple-select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { categoriesApi, type BookCategory, type CategoryListParams } from "@/lib/api/categories"
 import CreateCategoryModal from "./create-category-modal"
@@ -42,7 +42,7 @@ export default function CategoryManagement() {
     setError(null)
 
     try {
-      const response = await categoriesApi.getList(params, access_token)
+      const response = await categoriesApi.getList(params)
       setCategoryList(response.data)
       setTotalPages(response.totalPages)
       setTotalCount(response.totalCount)

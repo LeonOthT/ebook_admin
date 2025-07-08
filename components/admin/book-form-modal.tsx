@@ -10,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Edit, Upload, FileText, Loader2 } from "lucide-react"
 import { useAppSelector } from "@/lib/hooks"
-import { useToast } from "@/hooks/use-toast"
-import { useBookCategories } from "@/hooks/use-reference-data"
+import { useToast } from "@/lib/hooks/use-toast"
+import { useBookCategories } from "@/lib/hooks/use-reference-data"
 import { booksApi, type CreateBookRequest, type BookDetailResponse } from "@/lib/api/books"
 import { devLog } from "@/lib/config"
 
@@ -195,7 +195,7 @@ export default function BookFormModal({ mode, bookData, trigger, open: externalO
           isbn: formData.isbn || undefined,
         }
 
-        const result = await booksApi.create(requestData, access_token)
+        const result = await booksApi.create(requestData)
         
         toast({
           title: "Thành công!",
@@ -244,7 +244,7 @@ export default function BookFormModal({ mode, bookData, trigger, open: externalO
           updateData.append("file", selectedFile)
         }
 
-        const result = await booksApi.update(bookData!.id, updateData, access_token)
+        const result = await booksApi.update(bookData!.id, updateData)
         
         const hasNewEpub = selectedFile && selectedFile.name.toLowerCase().endsWith('.epub')
         const successMessage = hasNewEpub 

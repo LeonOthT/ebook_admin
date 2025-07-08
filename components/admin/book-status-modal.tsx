@@ -16,10 +16,12 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { SimpleSelect } from "@/components/ui/simple-select"
-import { useToast } from "@/hooks/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/lib/hooks/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 import { useAppSelector } from "@/lib/hooks"
 import { booksApi, type BookStatusRequest } from "@/lib/api/books"
 
@@ -29,6 +31,8 @@ interface BookStatusModalProps {
   currentBookStatus?: number // 0: Inactive, 1: Active
   currentApprovalStatus?: number // 0: Pending, 1: Approved, 2: Rejected
   currentPremium?: boolean
+  open?: boolean // External control of open state
+  onOpenChange?: (open: boolean) => void // External control callback
   onSuccess?: () => void
   children: React.ReactNode
 }
@@ -39,10 +43,16 @@ export default function BookStatusModal({
   currentBookStatus,
   currentApprovalStatus,
   currentPremium,
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange,
   onSuccess,
   children,
 }: BookStatusModalProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  
+  // Use external open state if provided, otherwise use internal state
+  const open = externalOpen !== undefined ? externalOpen : internalOpen
+  const setOpen = externalOnOpenChange || setInternalOpen
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<BookStatusRequest>({
@@ -106,7 +116,7 @@ export default function BookStatusModal({
 
     try {
       console.log("Updating book status for book ID:", bookId)
-      const result = await booksApi.updateStatus(bookId, formData, access_token)
+              const result = await booksApi.updateStatus(bookId, formData)
       console.log("Book status updated successfully:", result)
 
       // Show success toast
@@ -162,35 +172,66 @@ export default function BookStatusModal({
 
             <div className="grid gap-2">
               <Label htmlFor="approval_status">Trạng thái phê duyệt</Label>
-              <SimpleSelect
+              <Select
                 value={formData.approval_status?.toString() || ""}
-                onValueChange={(value) =>
+                onValueChange={(value: string) =>
                   setFormData({ ...formData, approval_status: Number.parseInt(value) as 0 | 1 | 2 })
                 }
-                placeholder="Chọn trạng thái"
                 disabled={isLoading || !isAdmin}
-                options={[
-                  { value: "0", label: "🟡 Chờ duyệt" },
-                  { value: "1", label: "✅ Đã duyệt" },
-                  { value: "2", label: "❌ Từ chối" }
-                ]}
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                      <span>Chờ duyệt</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span>Đã duyệt</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      <span>Từ chối</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="book_status">Trạng thái sách</Label>
-              <SimpleSelect
+              <Select
                 value={formData.status?.toString() || ""}
-                onValueChange={(value) =>
+                onValueChange={(value: string) =>
                   setFormData({ ...formData, status: Number.parseInt(value) as 0 | 1 })
                 }
-                placeholder="Chọn trạng thái"
                 disabled={isLoading || !isAdmin}
-                options={[
-                  { value: "1", label: "🟢 Hoạt động" },
-                  { value: "0", label: "🔴 Không hoạt động" }
-                ]}
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span>Hoạt động</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      <span>Không hoạt động</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-2">
@@ -223,18 +264,32 @@ export default function BookStatusModal({
             </div>
 
             {/* Hiển thị thông tin hiện tại */}
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <h4 className="font-medium mb-2">Trạng thái hiện tại:</h4>
-              <div className="text-sm space-y-1">
-                <p>
-                  <span className="font-medium">Sách:</span> {currentBookStatus === 1 ? "🟢 Hoạt động" : "🔴 Không hoạt động"}
-                </p>
-                <p>
-                  <span className="font-medium">Phê duyệt:</span> {getStatusText(currentApprovalStatus || 0)}
-                </p>
-                <p>
-                  <span className="font-medium">Premium:</span> {currentPremium ? "Có" : "Không"}
-                </p>
+            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h4 className="font-medium mb-3 text-gray-900 dark:text-gray-100">Trạng thái hiện tại:</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sách:</span>
+                  <Badge variant={currentBookStatus === 1 ? "default" : "destructive"}>
+                    {currentBookStatus === 1 ? "Hoạt động" : "Không hoạt động"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Phê duyệt:</span>
+                  <Badge 
+                    variant={
+                      currentApprovalStatus === 1 ? "default" : 
+                      currentApprovalStatus === 2 ? "destructive" : "secondary"
+                    }
+                  >
+                    {getStatusText(currentApprovalStatus || 0)}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Premium:</span>
+                  <Badge variant={currentPremium ? "default" : "outline"}>
+                    {currentPremium ? "Có" : "Không"}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>
@@ -260,43 +315,38 @@ export default function BookStatusModal({
     </Dialog>
   )
 }
-// Thay vì wrap DropdownMenuItem, tạo một trigger riêng
-export function BookStatusTrigger({
-  bookId,
-  bookTitle,
-  currentBookStatus,
-  currentApprovalStatus,
-  currentPremium,
-  onSuccess,
-}: {
+// Hook để quản lý BookStatusModal giống pattern của các modal khác
+export function useBookStatusModal() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [bookData, setBookData] = useState<{
+    bookId: string
+    bookTitle: string
+    currentBookStatus?: number
+    currentApprovalStatus?: number
+    currentPremium?: boolean
+  } | null>(null)
+
+  const openModal = (data: {
   bookId: string
   bookTitle: string
   currentBookStatus?: number
   currentApprovalStatus?: number
   currentPremium?: boolean
-  onSuccess?: () => void
-}) {
-  const handleClick = () => {
-    console.log("BookStatusTrigger clicked for book:", bookId)
+  }) => {
+    setBookData(data)
+    setIsOpen(true)
   }
 
-  return (
-    <BookStatusModal
-      bookId={bookId}
-      bookTitle={bookTitle}
-      currentBookStatus={currentBookStatus}
-      currentApprovalStatus={currentApprovalStatus}
-      currentPremium={currentPremium}
-      onSuccess={onSuccess}
-    >
-      <div
-        className="flex items-center w-full px-2 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm"
-        onClick={handleClick}
-      >
-        <Settings className="mr-2 h-4 w-4" />
-        Quản lý trạng thái
-      </div>
-    </BookStatusModal>
-  )
+  const closeModal = () => {
+    setIsOpen(false)
+    setBookData(null)
+  }
+
+  return {
+    isOpen,
+    bookData,
+    openModal,
+    closeModal,
+  }
 }
 

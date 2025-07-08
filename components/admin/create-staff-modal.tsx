@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SimpleSelect } from "@/components/ui/simple-select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { staffApi, type CreateStaffRequest } from "@/lib/api/staff"
 
@@ -65,7 +65,7 @@ export default function CreateStaffModal({ onSuccess }: CreateStaffModalProps) {
     setError(null)
 
     try {
-      await staffApi.create(formData, access_token)
+      await staffApi.create(formData)
       
       // Show success toast
       toast({
