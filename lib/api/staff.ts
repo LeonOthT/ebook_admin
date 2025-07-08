@@ -8,7 +8,17 @@ export interface CreateStaffRequest {
   phone: string
   address: string
   password: string
-  position: 2 | 4 // 2: Staff, 4: LibraryManager
+  position: 2 | 3 // 2: Staff, 3: LibraryManager (Administrator removed from system)
+}
+
+export interface UpdateStaffRequest {
+  first_name?: string
+  last_name?: string
+  email?: string
+  phone?: string
+  address?: string
+  position?: 2 | 3 // 2: Staff, 3: LibraryManager (Administrator removed from system)
+  is_active?: boolean // Re-add this since backend PATCH endpoint supports it
 }
 
 export interface Staff {
@@ -31,7 +41,7 @@ export interface StaffListParams {
   fullName?: string
   email?: string
   phone?: string
-  position?: number // 0: Unknown, 1: Administrator, 2: Staff, 3: UserManager, 4: LibraryManager
+  position?: number // 2: Staff, 3: LibraryManager (Administrator excluded from system)
   isActive?: boolean
   sortBy?: 'staffcode' | 'fullname' | 'email' | 'phone' | 'position' | 'createdat'
   isAscending?: boolean
@@ -49,6 +59,12 @@ export interface StaffListResponse {
   totalCount: number
   hasPreviousPage: boolean
   hasNextPage: boolean
+}
+
+export interface StaffDetailResponse {
+  result: string
+  data: Staff
+  message: string
 }
 
 export const staffApi = {
@@ -90,6 +106,26 @@ export const staffApi = {
     return result
   },
 
+  // Lấy thông tin chi tiết nhân viên
+  getById: async (staffId: string): Promise<Staff> => {
+    const url = getApiUrl(config.api.staff.getById(staffId))
+    devLog("Get staff detail API request URL:", url)
+    
+    const response = await authFetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    const result: StaffDetailResponse = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy thông tin nhân viên thất bại")
+    }
+
+    return result.data
+  },
+
   // Tạo nhân viên mới
   create: async (data: CreateStaffRequest) => {
     const response = await authFetch(getApiUrl(config.api.staff.create), {
@@ -103,6 +139,50 @@ export const staffApi = {
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
       throw new Error(result.message || "Tạo nhân viên thất bại")
+    }
+
+    return result.data
+  },
+
+  // Cập nhật thông tin nhân viên (PATCH - Partial Update) - KHÔNG bao gồm status
+  update: async (staffId: string, data: UpdateStaffRequest): Promise<Staff> => {
+    const url = getApiUrl(config.api.staff.update(staffId))
+    devLog("Update staff API request URL:", url)
+    devLog("Update staff data:", data)
+    
+    const response = await authFetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    const result: StaffDetailResponse = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Cập nhật thông tin nhân viên thất bại")
+    }
+
+    return result.data
+  },
+
+  // Toggle trạng thái hoạt động của nhân viên (sử dụng PATCH endpoint)
+  toggleActive: async (staffId: string, isActive: boolean): Promise<Staff> => {
+    const url = getApiUrl(config.api.staff.update(staffId))
+    devLog("Toggle staff status API request URL:", url)
+    devLog("Toggle staff status data:", { isActive })
+    
+    const response = await authFetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ is_active: isActive }),
+    })
+
+    const result: StaffDetailResponse = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Thay đổi trạng thái nhân viên thất bại")
     }
 
     return result.data

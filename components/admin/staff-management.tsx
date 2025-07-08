@@ -1,20 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Eye, Edit, Trash2, UserCheck, UserX, X, ArrowUp, ArrowDown } from "lucide-react"
+import { Search, Filter, Plus, Eye, Edit, Trash2, UserCheck, UserX, X, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SimpleSelect } from "@/components/ui/simple-select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { staffApi, type Staff, type StaffListParams } from "@/lib/api/staff"
 import CreateStaffModal from "./create-staff-modal"
+import StaffDetailModal from "./staff-detail-modal"
+import UpdateStaffModal from "./update-staff-modal"
+import { useConfirmModal } from "@/components/ui/confirm-modal"
 
 export default function StaffManagement() {
   const [staffList, setStaffList] = useState<Staff[]>([])
@@ -30,12 +33,25 @@ export default function StaffManagement() {
   const [totalCount, setTotalCount] = useState(0)
   const [mounted, setMounted] = useState(false)
 
+  // Modal states
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [selectedStaffForEdit, setSelectedStaffForEdit] = useState<string | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+
   const { access_token } = useAppSelector((state) => state.auth)
   const { toast } = useToast()
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    if (mounted) {
+      setPageNumber(1)
+    }
+  }, [searchQuery, positionFilter, statusFilter, sortBy, isAscending, mounted])
 
   const fetchStaffList = async (params: StaffListParams = {}) => {
     if (!access_token) return
@@ -65,18 +81,12 @@ export default function StaffManagement() {
     }
   }
 
-  useEffect(() => {
-    if (mounted) {
-      fetchStaffList({ pageNumber: 1, pageSize: 10, sortBy: "createdat" as any, isAscending: false })
-    }
-  }, [access_token, mounted])
-
-  // Real-time filtering - tự động fetch khi filter thay đổi
+  // Initial fetch và filter changes - combined để tránh duplicate calls
   useEffect(() => {
     if (!mounted) return
 
     const params: StaffListParams = {
-      pageNumber: 1,
+      pageNumber: pageNumber,
       pageSize: 10,
       sortBy: sortBy as any,
       isAscending,
@@ -100,7 +110,7 @@ export default function StaffManagement() {
     }, searchQuery.trim() ? 500 : 0) // 500ms debounce cho search, ngay lập tức cho dropdown
 
     return () => clearTimeout(timeoutId)
-  }, [searchQuery, positionFilter, statusFilter, sortBy, isAscending, mounted])
+  }, [searchQuery, positionFilter, statusFilter, sortBy, isAscending, pageNumber, mounted, access_token])
 
   const handleResetFilters = () => {
     setSearchQuery("")
@@ -134,16 +144,114 @@ export default function StaffManagement() {
     fetchStaffList(params)
   }
 
+  const handleViewStaff = (staffId: string) => {
+    setSelectedStaffId(staffId)
+    setIsDetailModalOpen(true)
+  }
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false)
+    setSelectedStaffId(null)
+  }
+
+  const handleEditStaff = (staffId: string) => {
+    setSelectedStaffForEdit(staffId)
+    setIsEditModalOpen(true)
+  }
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false)
+    setSelectedStaffForEdit(null)
+  }
+
+  const handleToggleStaffActive = (staff: Staff) => {
+    const newStatus = !staff.is_active
+    const confirmModal = useConfirmModal.getState()
+    
+    confirmModal.open({
+      title: `${newStatus ? 'Kích hoạt' : 'Vô hiệu hóa'} tài khoản nhân viên`,
+      description: `Bạn có chắc chắn muốn ${newStatus ? 'kích hoạt lại' : 'vô hiệu hóa'} tài khoản nhân viên sau không?`,
+      content: (
+        <div className="space-y-4">
+          <div className="bg-gray-50 dark:bg-gray-900 border rounded-lg p-3 space-y-1">
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{staff.full_name}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Email: {staff.email}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Chức vụ: {staff.position}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">ID: {getShortId(staff.id)}</p>
+          </div>
+          {!newStatus && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-600 dark:text-yellow-400 text-lg leading-none">⚠️</span>
+                <div className="space-y-1">
+                  <p className="text-yellow-800 dark:text-yellow-200 text-sm font-medium">
+                    Nhân viên sẽ không thể đăng nhập!
+                  </p>
+                  <p className="text-yellow-700 dark:text-yellow-300 text-xs">
+                    Tài khoản sẽ bị khóa và không thể truy cập hệ thống
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+      confirmText: newStatus ? "Kích hoạt" : "Vô hiệu hóa",
+      confirmVariant: newStatus ? "default" : "destructive",
+      onConfirm: async () => {
+        try {
+          await staffApi.toggleActive(staff.id, newStatus)
+          
+          toast({
+            title: "Thành công!",
+            description: `Nhân viên đã được ${newStatus ? 'kích hoạt' : 'vô hiệu hóa'} thành công.`,
+            variant: "default",
+          })
+          
+          // Refresh the staff list
+          const params: StaffListParams = {
+            pageNumber,
+            pageSize: 10,
+            sortBy: sortBy as any,
+            isAscending,
+          }
+
+          if (searchQuery.trim()) {
+            params.fullName = searchQuery.trim()
+          }
+
+          if (positionFilter) {
+            params.position = parseInt(positionFilter)
+          }
+
+          if (statusFilter) {
+            params.isActive = statusFilter === "active"
+          }
+
+          await fetchStaffList(params)
+        } catch (err: any) {
+          console.error("Error toggling staff status:", err)
+          toast({
+            title: "Lỗi!",
+            description: err.message || "Có lỗi xảy ra khi thay đổi trạng thái nhân viên.",
+            variant: "destructive",
+          })
+          throw err // Re-throw to keep modal in loading state
+        }
+      }
+    })
+  }
+
   const getShortId = (id: string) => {
     return id.slice(-8)
   }
 
   const getPositionBadgeVariant = (positionId: number) => {
     switch (positionId) {
-      case 1: return "default" // Administrator
+      case 0: return "outline" // Unknown
+      case 1: return "default" // Administrator (legacy data)
       case 2: return "secondary" // Staff
-      case 3: return "outline" // UserManager
-      case 4: return "destructive" // LibraryManager
+      case 3: return "destructive" // LibraryManager
       default: return "outline"
     }
   }
@@ -181,10 +289,8 @@ export default function StaffManagement() {
               placeholder="Chức vụ"
               className="w-[120px]"
               options={[
-                { value: "1", label: "Administrator" },
                 { value: "2", label: "Staff" },
-                { value: "3", label: "User Manager" },
-                { value: "4", label: "Library Manager" }
+                { value: "3", label: "Library Manager" }
               ]}
             />
 
@@ -292,19 +398,20 @@ export default function StaffManagement() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
                           <span className="sr-only">Mở menu</span>
-                          <Eye className="h-4 w-4" />
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewStaff(staff.id)}>
                           <Eye className="mr-2 h-4 w-4" />
                           Xem chi tiết
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditStaff(staff.id)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleToggleStaffActive(staff)}>
                           {staff.is_active ? (
                             <>
                               <UserX className="mr-2 h-4 w-4" />
@@ -316,10 +423,6 @@ export default function StaffManagement() {
                               Kích hoạt
                             </>
                           )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa nhân viên
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -359,6 +462,37 @@ export default function StaffManagement() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Modals */}
+      {selectedStaffId && (
+        <StaffDetailModal 
+          staffId={selectedStaffId}
+          open={isDetailModalOpen}
+          onOpenChange={(open) => {
+            setIsDetailModalOpen(open)
+            if (!open) {
+              handleCloseDetailModal()
+            }
+          }}
+        />
+      )}
+
+      {selectedStaffForEdit && (
+        <UpdateStaffModal 
+          staffId={selectedStaffForEdit}
+          open={isEditModalOpen}
+          onOpenChange={(open) => {
+            setIsEditModalOpen(open)
+            if (!open) {
+              handleCloseEditModal()
+            }
+          }}
+          onSuccess={() => {
+            handleCloseEditModal()
+            fetchStaffList({ pageNumber, pageSize: 10, sortBy: sortBy as any, isAscending })
+          }}
+        />
       )}
     </div>
   )

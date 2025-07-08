@@ -15,6 +15,12 @@ export interface CreateCategoryRequest {
   description: string
 }
 
+export interface UpdateCategoryRequest {
+  name?: string
+  description?: string
+  isActive?: boolean
+}
+
 export interface CategoryListParams {
   name?: string
   description?: string
@@ -97,6 +103,48 @@ export const categoriesApi = {
     }
 
     return result.data
+  },
+
+  // Lấy chi tiết danh mục theo ID
+  getById: async (id: string): Promise<BookCategory> => {
+    const response = await authFetch(getApiUrl(config.api.categories.getById(id)))
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy thông tin danh mục thất bại")
+    }
+
+    return result.data
+  },
+
+  // Cập nhật danh mục
+  update: async (id: string, data: UpdateCategoryRequest): Promise<BookCategory> => {
+    const response = await authFetch(getApiUrl(config.api.categories.update(id)), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Cập nhật danh mục thất bại")
+    }
+
+    return result.data
+  },
+
+  // Xóa danh mục
+  delete: async (id: string): Promise<void> => {
+    const response = await authFetch(getApiUrl(config.api.categories.delete(id)), {
+      method: "DELETE",
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Xóa danh mục thất bại")
+    }
   },
 
   // Lấy danh sách categories cho dropdown (sử dụng reference API)
