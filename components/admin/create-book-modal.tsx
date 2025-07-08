@@ -1,17 +1,20 @@
 "use client"
 
-import BookFormModal from "./book-form-modal"
+import CreateBookForm from "./create-book-form"
 
 interface CreateBookModalProps {
   trigger?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   onSuccess?: () => void
 }
 
-export default function CreateBookModal({ trigger, onSuccess }: CreateBookModalProps) {
+export default function CreateBookModal({ trigger, open, onOpenChange, onSuccess }: CreateBookModalProps) {
   return (
-    <BookFormModal
-      mode="create"
+    <CreateBookForm
       trigger={trigger}
+      open={open}
+      onOpenChange={onOpenChange}
       onSuccess={onSuccess}
     />
   )

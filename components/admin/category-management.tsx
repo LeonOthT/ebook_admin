@@ -1,19 +1,20 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Eye, Edit, Trash2, FolderPlus, X, ArrowUp, ArrowDown } from "lucide-react"
+import { Search, Trash2, Edit } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
 import { SimpleSelect } from "@/components/ui/simple-select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { categoriesApi, type BookCategory, type CategoryListParams } from "@/lib/api/categories"
-import CreateCategoryModal from "./create-category-modal"
+import CategoryFormModal from "./category-form-modal"
+import { useConfirmModal } from "@/components/ui/confirm-modal"
 
 export default function CategoryManagement() {
   const [categoryList, setCategoryList] = useState<BookCategory[]>([])
@@ -27,6 +28,8 @@ export default function CategoryManagement() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<BookCategory | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   const { access_token } = useAppSelector((state) => state.auth)
   const { toast } = useToast()
@@ -34,6 +37,13 @@ export default function CategoryManagement() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    if (mounted) {
+      setPageNumber(1)
+    }
+  }, [searchQuery, statusFilter, sortBy, isAscending, mounted])
 
   const fetchCategoryList = async (params: CategoryListParams = {}) => {
     if (!access_token) return
@@ -63,19 +73,13 @@ export default function CategoryManagement() {
     }
   }
 
-  useEffect(() => {
-    if (mounted) {
-      fetchCategoryList({ pageNumber: 1, pageSize: 10, sortBy: "createdat", isAscending: false })
-    }
-  }, [access_token, mounted])
-
-  // Real-time filtering - tự động fetch khi filter thay đổi
+  // Combined useEffect for initial load and filter changes (prevents double call)
   useEffect(() => {
     if (!mounted) return
 
     const params: CategoryListParams = {
-      pageNumber: 1,
-      pageSize: 10,
+      pageNumber: pageNumber,
+      pageSize: 9, // 3x3 grid layout
       sortBy: sortBy as any,
       isAscending,
     }
@@ -94,13 +98,14 @@ export default function CategoryManagement() {
     }, searchQuery.trim() ? 500 : 0) // 500ms debounce cho search, ngay lập tức cho dropdown
 
     return () => clearTimeout(timeoutId)
-  }, [searchQuery, statusFilter, sortBy, isAscending, mounted])
+  }, [searchQuery, statusFilter, sortBy, isAscending, pageNumber, mounted, access_token])
 
   const handleResetFilters = () => {
     setSearchQuery("")
     setStatusFilter("")
     setSortBy("createdat")
     setIsAscending(false)
+    setPageNumber(1)
     // fetchCategoryList sẽ tự động được gọi qua useEffect
   }
 
@@ -110,9 +115,10 @@ export default function CategoryManagement() {
   }
 
   const handlePageChange = (newPage: number) => {
+    setPageNumber(newPage)
     const params: CategoryListParams = {
       pageNumber: newPage,
-      pageSize: 10,
+      pageSize: 9, // 3x3 grid layout
       sortBy: sortBy as any,
       isAscending,
     }
@@ -140,6 +146,107 @@ export default function CategoryManagement() {
     return new Date(dateString).toLocaleDateString("vi-VN")
   }
 
+  const getCurrentParams = (): CategoryListParams => {
+    const params: CategoryListParams = {
+      pageNumber,
+      pageSize: 9, // 3x3 grid layout
+      sortBy: sortBy as any,
+      isAscending,
+    }
+
+    if (searchQuery.trim()) {
+      params.name = searchQuery.trim()
+    }
+
+    if (statusFilter) {
+      params.status = statusFilter === "active" ? 1 : 0
+    }
+
+    return params
+  }
+
+  const handleEditCategory = async (categoryId: string): Promise<void> => {
+    if (!access_token) return
+
+    try {
+      const categoryDetail = await categoriesApi.getById(categoryId)
+      setSelectedCategoryForEdit(categoryDetail)
+      setIsEditModalOpen(true)
+    } catch (err: any) {
+      console.error("Error fetching category detail for edit:", err)
+      toast({
+        title: "Lỗi!",
+        description: err.message || "Có lỗi xảy ra khi tải thông tin danh mục.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false)
+    setSelectedCategoryForEdit(null)
+  }
+
+  const handleDeleteCategory = (category: BookCategory) => {
+    if (!access_token) return
+
+    const confirmModal = useConfirmModal.getState()
+    confirmModal.open({
+      title: "Xác nhận xóa danh mục",
+      description: "Bạn có chắc chắn muốn xóa danh mục sau không?",
+      content: (
+        <div className="space-y-4">
+          <div className="bg-gray-50 dark:bg-gray-900 border rounded-lg p-3 space-y-1">
+            <p className="font-semibold text-gray-900 dark:text-gray-100">"{category.name}"</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Mô tả: {category.description}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Số sách: {category.books_count}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">ID: {getShortId(category.id)}</p>
+          </div>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <span className="text-red-600 dark:text-red-400 text-lg leading-none">⚠️</span>
+              <div className="space-y-1">
+                <p className="text-red-800 dark:text-red-200 text-sm font-medium">
+                  Hành động này không thể hoàn tác!
+                </p>
+                <p className="text-red-700 dark:text-red-300 text-xs">
+                  Chỉ có thể xóa danh mục không chứa sách nào
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+      confirmText: "Xóa danh mục",
+      confirmVariant: "destructive",
+      onConfirm: async () => {
+        if (!access_token) return
+
+        try {
+          await categoriesApi.delete(category.id)
+          
+          toast({
+            title: "Thành công!",
+            description: `Đã xóa danh mục "${category.name}" thành công.`,
+            variant: "default",
+          })
+          
+          // Refresh list with current params
+          fetchCategoryList(getCurrentParams())
+        } catch (err: any) {
+          console.error("Error deleting category:", err)
+          
+          toast({
+            title: "Lỗi!",
+            description: err.message || "Có lỗi xảy ra khi xóa danh mục.",
+            variant: "destructive",
+          })
+          throw err // Re-throw to keep modal in loading state
+        }
+      }
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -149,7 +256,7 @@ export default function CategoryManagement() {
             Quản lý danh sách danh mục sách trong hệ thống ({totalCount} danh mục)
           </p>
         </div>
-        <CreateCategoryModal onSuccess={() => fetchCategoryList({ pageNumber, pageSize: 10, sortBy: sortBy as any, isAscending })} />
+        <CategoryFormModal mode="create" onSuccess={() => fetchCategoryList(getCurrentParams())} />
       </div>
 
       {/* Bộ lọc và tìm kiếm */}
@@ -234,37 +341,9 @@ export default function CategoryManagement() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{category.name}</CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={getStatusBadgeVariant(category.status)}>
-                          {category.status === "Active" ? "Hoạt động" : "Không hoạt động"}
-                        </Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Mở menu</span>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Xem chi tiết
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Chỉnh sửa
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FolderPlus className="mr-2 h-4 w-4" />
-                              {category.status === "Active" ? "Vô hiệu hóa" : "Kích hoạt"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Xóa danh mục
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                      <Badge variant={getStatusBadgeVariant(category.status)}>
+                        {category.status === "Active" ? "Hoạt động" : "Không hoạt động"}
+                      </Badge>
                     </div>
                     <CardDescription className="line-clamp-2">
                       {category.description}
@@ -283,13 +362,22 @@ export default function CategoryManagement() {
                       <span>{formatDate(category.created_at)}</span>
                     </div>
                     <div className="flex items-center justify-end space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleEditCategory(category.id)}
+                      >
                         <Edit className="h-3 w-3 mr-1" />
                         Sửa
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-3 w-3 mr-1" />
-                        Xem
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDeleteCategory(category)}
+                        className="text-red-600 hover:text-red-700 hover:border-red-300"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Xóa
                       </Button>
                     </div>
                   </CardContent>
@@ -328,6 +416,25 @@ export default function CategoryManagement() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Edit Modal */}
+      {selectedCategoryForEdit && (
+        <CategoryFormModal
+          mode="update"
+          category={selectedCategoryForEdit}
+          open={isEditModalOpen}
+          onOpenChange={(open) => {
+            setIsEditModalOpen(open)
+            if (!open) {
+              handleCloseEditModal()
+            }
+          }}
+          onSuccess={() => {
+            handleCloseEditModal()
+            fetchCategoryList(getCurrentParams())
+          }}
+        />
       )}
     </div>
   )

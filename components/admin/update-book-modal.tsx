@@ -1,20 +1,21 @@
 "use client"
 
-import BookFormModal from "./book-form-modal"
+import UpdateBookForm from "./update-book-form"
 import { BookDetailResponse } from "@/lib/api/books"
 
 interface UpdateBookModalProps {
-  bookData: BookDetailResponse
+  bookId?: string // Pass bookId to let modal fetch fresh data
+  bookData?: BookDetailResponse // Legacy support for existing bookData
   trigger?: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
   onSuccess?: () => void
 }
 
-export default function UpdateBookModal({ bookData, trigger, open, onOpenChange, onSuccess }: UpdateBookModalProps) {
+export default function UpdateBookModal({ bookId, bookData, trigger, open, onOpenChange, onSuccess }: UpdateBookModalProps) {
   return (
-    <BookFormModal
-      mode="update"
+    <UpdateBookForm
+      bookId={bookId}
       bookData={bookData}
       trigger={trigger}
       open={open}

@@ -13,6 +13,8 @@ export const config = {
     staff: {
       list: '/staff/list',
       create: '/staff',
+      getById: (staffId: string) => `/staff/${staffId}`,
+      update: (staffId: string) => `/staff/${staffId}`,
     },
     books: {
       list: '/books/list',
@@ -26,6 +28,9 @@ export const config = {
     categories: {
       list: '/book-categories/list',
       create: '/book-categories',
+      getById: (id: string) => `/book-categories/${id}`,
+      update: (id: string) => `/book-categories/${id}`,
+      delete: (id: string) => `/book-categories/${id}`,
       getAll: '/book-categories',
     },
   },

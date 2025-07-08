@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Search, MoreHorizontal, Eye, Edit, Trash2, Loader2, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { booksApi, type Book, type BookListParams, type BookDetailResponse } from "@/lib/api/books"
-import { useBookCategories } from "@/lib/hooks/use-reference-data"
+import { referenceApi, type DropdownOption } from "@/lib/api/reference"
 import CreateBookModal from "./create-book-modal"
 import UpdateBookModal from "./update-book-modal"
 import BookDetailModal from "./book-detail-modal"
@@ -67,21 +67,55 @@ export default function BookManagement() {
   const [totalCount, setTotalCount] = useState(0)
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [selectedBookForEdit, setSelectedBookForEdit] = useState<BookDetailResponse | null>(null)
+  const [selectedBookForEdit, setSelectedBookForEdit] = useState<string | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
+  // Categories state
+  const [categories, setCategories] = useState<DropdownOption[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
+
+  // Use refs to track API calls and prevent duplicates
+  const hasLoadedCategoriesRef = useRef(false)
+  const categoriesLoadingRef = useRef(false)
+
   // Book status modal
   const bookStatusModal = useBookStatusModal()
-
-  // Sử dụng reference API cho categories với auto-load (cần cho filter ngay)
-  const { categories, isLoading: categoriesLoading, error: categoriesError } = useBookCategories(true)
 
   const { access_token, user } = useAppSelector((state) => state.auth)
   const { toast } = useToast()
 
   // Kiểm tra quyền Admin
   const isAdmin = user?.app_role?.includes("Admin") || false
+
+  // Load categories
+  const loadCategories = async () => {
+    if (categoriesLoadingRef.current || hasLoadedCategoriesRef.current) {
+      console.log("Categories already loaded or loading, skipping")
+      return
+    }
+    
+    categoriesLoadingRef.current = true
+    setCategoriesLoading(true)
+    
+    try {
+      console.log("Loading categories...")
+      const categoryOptions = await referenceApi.getBookCategories()
+      setCategories(categoryOptions)
+      hasLoadedCategoriesRef.current = true
+      console.log("Categories loaded:", categoryOptions.length)
+    } catch (err: any) {
+      console.error("Error loading categories:", err)
+      toast({
+        title: "Lỗi!",
+        description: err.message || "Không thể tải danh sách danh mục.",
+        variant: "destructive",
+      })
+    } finally {
+      categoriesLoadingRef.current = false
+      setCategoriesLoading(false)
+    }
+  }
 
   const fetchBookList = async (params: BookListParams = {}) => {
     if (!access_token || !mounted) return
@@ -108,10 +142,20 @@ export default function BookManagement() {
     }
   }
 
-  // Initial mount
+  // Initial mount - load categories once
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    if (!mounted) {
+      setMounted(true)
+      loadCategories()
+    }
+  }, [mounted])
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    if (mounted) {
+      setPageNumber(1)
+    }
+  }, [searchQuery, categoryFilter, approvalStatusFilter, statusFilter, premiumFilter, sortBy, isAscending, mounted])
 
   // Initial fetch and filter changes
   useEffect(() => {
@@ -175,18 +219,8 @@ export default function BookManagement() {
   const handleEditBook = async (bookId: string): Promise<void> => {
     if (!access_token) return
 
-    try {
-      const bookDetail = await booksApi.getDetail(bookId)
-      setSelectedBookForEdit(bookDetail)
-      setIsEditModalOpen(true)
-    } catch (err: any) {
-      console.error("Error fetching book detail for edit:", err)
-      toast({
-        title: "Lỗi!",
-        description: err.message || "Có lỗi xảy ra khi tải thông tin sách.",
-        variant: "destructive",
-      })
-    }
+    setSelectedBookForEdit(bookId)
+    setIsEditModalOpen(true)
   }
 
   const handleCloseEditModal = () => {
@@ -308,7 +342,7 @@ export default function BookManagement() {
 
       {/* Filters */}
       {mounted && (
-        <div className="flex flex-col gap-4 sticky top-0 bg-background z-10 pb-4 border-b">
+        <div className="flex flex-col gap-4 pb-4 border-b">
           <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -500,16 +534,18 @@ export default function BookManagement() {
                             <Edit className="mr-2 h-4 w-4" />
                             Chỉnh sửa
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => bookStatusModal.openModal({
-                            bookId: book.id,
-                            bookTitle: book.title,
-                            currentBookStatus: book.status,
-                            currentApprovalStatus: book.approval_status,
-                            currentPremium: book.is_premium,
-                          })}>
-                            <Settings className="mr-2 h-4 w-4" />
-                            Quản lý trạng thái
-                          </DropdownMenuItem>
+                          {isAdmin && (
+                            <DropdownMenuItem onClick={() => bookStatusModal.openModal({
+                              bookId: book.id,
+                              bookTitle: book.title,
+                              currentBookStatus: book.status,
+                              currentApprovalStatus: book.approval_status,
+                              currentPremium: book.is_premium,
+                            })}>
+                              <Settings className="mr-2 h-4 w-4" />
+                              Quản lý trạng thái
+                            </DropdownMenuItem>
+                          )}
                           {isAdmin && (
                             <DropdownMenuItem 
                               className="text-red-600" 
@@ -571,7 +607,7 @@ export default function BookManagement() {
 
       {selectedBookForEdit && (
         <UpdateBookModal
-          bookData={selectedBookForEdit}
+          bookId={selectedBookForEdit}
           open={isEditModalOpen}
           onOpenChange={(open) => {
             setIsEditModalOpen(open)
