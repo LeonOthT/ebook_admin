@@ -1,4 +1,4 @@
-import { getApiUrl, config, devLog } from "@/lib/config"
+import { getApiUrl, config, devLog, authFetch } from "@/lib/config"
 
 export interface CreateBookRequest {
   file: File
@@ -130,7 +130,7 @@ export interface BookListResponse {
 
 export const booksApi = {
   // Tạo sách mới từ EPUB
-  create: async (data: CreateBookRequest, token: string) => {
+  create: async (data: CreateBookRequest) => {
     const formData = new FormData()
 
     formData.append("file", data.file)
@@ -140,11 +140,8 @@ export const booksApi = {
     if (data.tags) formData.append("tags", data.tags)
     if (data.isbn) formData.append("isbn", data.isbn)
 
-    const response = await fetch(getApiUrl(config.api.books.create), {
+    const response = await authFetch(getApiUrl(config.api.books.create), {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
       body: formData,
     })
 
@@ -157,12 +154,9 @@ export const booksApi = {
   },
 
   // Cập nhật sách
-  update: async (bookId: string, updateData: FormData, token: string) => {
-    const response = await fetch(getApiUrl(config.api.books.update(bookId)), {
+  update: async (bookId: string, updateData: FormData) => {
+    const response = await authFetch(getApiUrl(config.api.books.update(bookId)), {
       method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
       body: updateData,
     })
 
@@ -175,12 +169,11 @@ export const booksApi = {
   },
 
   // Cập nhật trạng thái sách (chỉ Admin)
-  updateStatus: async (bookId: string, data: BookStatusRequest, token: string) => {
-    const response = await fetch(getApiUrl(config.api.books.updateStatus(bookId)), {
+  updateStatus: async (bookId: string, data: BookStatusRequest) => {
+    const response = await authFetch(getApiUrl(config.api.books.updateStatus(bookId)), {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(data),
     })
@@ -199,7 +192,7 @@ export const booksApi = {
   },
 
   // Lấy danh sách sách với lọc, sắp xếp và phân trang
-  getList: async (params: BookListParams, token: string): Promise<BookListResponse> => {
+  getList: async (params: BookListParams): Promise<BookListResponse> => {
     const searchParams = new URLSearchParams()
     
     if (params.search) searchParams.append("search", params.search)
@@ -223,11 +216,7 @@ export const booksApi = {
     const url = getApiUrl(`${config.api.books.list}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`)
     devLog("Books API request URL:", url)
     
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const response = await authFetch(url)
 
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
@@ -246,12 +235,8 @@ export const booksApi = {
   },
 
   // Lấy thông tin chi tiết sách (không có chapters)
-  getDetail: async (bookId: string, token: string): Promise<BookDetailResponse> => {
-    const response = await fetch(getApiUrl(config.api.books.getDetail(bookId)), {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+  getDetail: async (bookId: string): Promise<BookDetailResponse> => {
+    const response = await authFetch(getApiUrl(config.api.books.getDetail(bookId)))
 
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
@@ -262,12 +247,8 @@ export const booksApi = {
   },
 
   // Lấy danh sách chapters của sách
-  getChapters: async (bookId: string, token: string): Promise<ChapterResponse[]> => {
-    const response = await fetch(getApiUrl(config.api.books.getChapters(bookId)), {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+  getChapters: async (bookId: string): Promise<ChapterResponse[]> => {
+    const response = await authFetch(getApiUrl(config.api.books.getChapters(bookId)))
 
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
@@ -278,12 +259,9 @@ export const booksApi = {
   },
 
   // Xóa sách (chỉ Admin)
-  delete: async (bookId: string, token: string) => {
-    const response = await fetch(getApiUrl(config.api.books.delete(bookId)), {
+  delete: async (bookId: string) => {
+    const response = await authFetch(getApiUrl(config.api.books.delete(bookId)), {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     })
 
     const result = await response.json()

@@ -1,4 +1,4 @@
-import { getApiUrl, config, devLog } from "@/lib/config"
+import { getApiUrl, config, devLog, authFetch } from "@/lib/config"
 
 export interface CreateStaffRequest {
   first_name: string
@@ -53,7 +53,7 @@ export interface StaffListResponse {
 
 export const staffApi = {
   // Lấy danh sách nhân viên
-  getList: async (params: StaffListParams = {}, token: string): Promise<StaffListResponse> => {
+  getList: async (params: StaffListParams = {}): Promise<StaffListResponse> => {
     const searchParams = new URLSearchParams()
     
     // Thêm các tham số lọc
@@ -75,11 +75,10 @@ export const staffApi = {
     const url = getApiUrl(`${config.api.staff.list}?${searchParams.toString()}`)
     devLog("Staff list API request URL:", url)
     
-    const response = await fetch(url, {
+    const response = await authFetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
     })
 
@@ -92,12 +91,11 @@ export const staffApi = {
   },
 
   // Tạo nhân viên mới
-  create: async (data: CreateStaffRequest, token: string) => {
-    const response = await fetch(getApiUrl(config.api.staff.create), {
+  create: async (data: CreateStaffRequest) => {
+    const response = await authFetch(getApiUrl(config.api.staff.create), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(data),
     })

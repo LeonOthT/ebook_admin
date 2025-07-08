@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, MoreHorizontal, Eye, Edit, Trash2, Loader2 } from "lucide-react"
+import { Search, MoreHorizontal, Eye, Edit, Trash2, Loader2, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -12,14 +12,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { SimpleSelect } from "@/components/ui/simple-select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { booksApi, type Book, type BookListParams, type BookDetailResponse } from "@/lib/api/books"
-import { useBookCategories } from "@/hooks/use-reference-data"
+import { useBookCategories } from "@/lib/hooks/use-reference-data"
 import CreateBookModal from "./create-book-modal"
 import UpdateBookModal from "./update-book-modal"
 import BookDetailModal from "./book-detail-modal"
-import { BookStatusTrigger } from "./book-status-modal"
+import BookStatusModal, { useBookStatusModal } from "./book-status-modal"
 import { useConfirmModal } from "@/components/ui/confirm-modal"
 
 // Tách options ra khỏi component để tránh re-render
@@ -71,6 +71,9 @@ export default function BookManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
+  // Book status modal
+  const bookStatusModal = useBookStatusModal()
+
   // Sử dụng reference API cho categories với auto-load (cần cho filter ngay)
   const { categories, isLoading: categoriesLoading, error: categoriesError } = useBookCategories(true)
 
@@ -87,7 +90,7 @@ export default function BookManagement() {
     setError(null)
 
     try {
-      const response = await booksApi.getList(params, access_token)
+      const response = await booksApi.getList(params)
       setBookList(response.data)
       setTotalPages(response.totalPages)
       setTotalCount(response.totalCount)
@@ -173,7 +176,7 @@ export default function BookManagement() {
     if (!access_token) return
 
     try {
-      const bookDetail = await booksApi.getDetail(bookId, access_token)
+      const bookDetail = await booksApi.getDetail(bookId)
       setSelectedBookForEdit(bookDetail)
       setIsEditModalOpen(true)
     } catch (err: any) {
@@ -233,7 +236,7 @@ export default function BookManagement() {
         if (!access_token) return
 
         try {
-          await booksApi.delete(book.id, access_token)
+          await booksApi.delete(book.id)
           
           toast({
             title: "Thành công!",
@@ -497,14 +500,16 @@ export default function BookManagement() {
                             <Edit className="mr-2 h-4 w-4" />
                             Chỉnh sửa
                           </DropdownMenuItem>
-                          <BookStatusTrigger
-                            bookId={book.id}
-                            bookTitle={book.title}
-                            currentBookStatus={book.status}
-                            currentApprovalStatus={book.approval_status}
-                            currentPremium={book.is_premium}
-                            onSuccess={() => fetchBookList({ pageNumber, pageSize: 10, sortBy: sortBy as any, isAscending })}
-                          />
+                          <DropdownMenuItem onClick={() => bookStatusModal.openModal({
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            currentBookStatus: book.status,
+                            currentApprovalStatus: book.approval_status,
+                            currentPremium: book.is_premium,
+                          })}>
+                            <Settings className="mr-2 h-4 w-4" />
+                            Quản lý trạng thái
+                          </DropdownMenuItem>
                           {isAdmin && (
                             <DropdownMenuItem 
                               className="text-red-600" 
@@ -579,6 +584,25 @@ export default function BookManagement() {
             fetchBookList({ pageNumber, pageSize: 10, sortBy: sortBy as any, isAscending })
           }}
         />
+      )}
+
+      {bookStatusModal.bookData && (
+        <BookStatusModal
+          bookId={bookStatusModal.bookData.bookId}
+          bookTitle={bookStatusModal.bookData.bookTitle}
+          currentBookStatus={bookStatusModal.bookData.currentBookStatus}
+          currentApprovalStatus={bookStatusModal.bookData.currentApprovalStatus}
+          currentPremium={bookStatusModal.bookData.currentPremium}
+          open={bookStatusModal.isOpen}
+          onOpenChange={bookStatusModal.closeModal}
+          onSuccess={() => {
+            bookStatusModal.closeModal()
+            fetchBookList({ pageNumber, pageSize: 10, sortBy: sortBy as any, isAscending })
+          }}
+        >
+          {/* No trigger needed - controlled externally */}
+          <div />
+        </BookStatusModal>
       )}
     </div>
   )

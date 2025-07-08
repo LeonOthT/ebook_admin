@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { booksApi, type BookDetailResponse, type ChapterResponse } from "@/lib/api/books"
 
@@ -71,7 +71,7 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
     setError(null)
 
     try {
-      const detail = await booksApi.getDetail(bookId, access_token)
+              const detail = await booksApi.getDetail(bookId)
       setBookDetail(detail)
     } catch (err: any) {
       console.error("Error fetching book detail:", err)
@@ -92,7 +92,7 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
     setIsLoadingChapters(true)
 
     try {
-      const chaptersData = await booksApi.getChapters(bookId, access_token)
+              const chaptersData = await booksApi.getChapters(bookId)
       setChapters(chaptersData)
       setShowChapters(true)
     } catch (err: any) {
