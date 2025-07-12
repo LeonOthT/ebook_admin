@@ -33,6 +33,11 @@ export const config = {
       delete: (id: string) => `/book-categories/${id}`,
       getAll: '/book-categories',
     },
+    users: {
+      list: '/users/list',
+      getById: (userId: string) => `/users/${userId}`,
+      updateStatus: (userId: string) => `/users/${userId}/status`,
+    },
   },
   
   // Reference API Endpoints (for dropdowns)
