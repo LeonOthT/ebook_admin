@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter, Eye, UserCheck, UserX, X, ArrowUp, ArrowDown, MoreHorizontal, Crown } from "lucide-react"
+import { Search, Filter, Eye, UserCheck, UserX, X, MoreHorizontal, Crown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -16,6 +16,35 @@ import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { usersApi, type User, type UserDetail, type UserListParams } from "@/lib/api/users"
 import { useConfirmModal } from "@/components/ui/confirm-modal"
+import PaymentHistoryModal from "./payment-history-modal"
+import SubscriptionManagementModal from "./subscription-management-modal"
+
+// Tách options ra khỏi component để tránh re-render
+const FILTER_OPTIONS = {
+  gender: [
+    { value: "1", label: "Nam" },
+    { value: "0", label: "Nữ" },
+    { value: "2", label: "Khác" },
+  ],
+  status: [
+    { value: "active", label: "Hoạt động" },
+    { value: "inactive", label: "Bị khóa" },
+  ],
+  subscription: [
+    { value: "premium", label: "Premium" },
+    { value: "free", label: "Free" },
+  ],
+  sort: [
+    { value: "createdat-desc", label: "Mới nhất" },
+    { value: "createdat-asc", label: "Cũ nhất" },
+    { value: "name-asc", label: "Tên A→Z" },
+    { value: "name-desc", label: "Tên Z→A" },
+    { value: "email-asc", label: "Email A→Z" },
+    { value: "email-desc", label: "Email Z→A" },
+    { value: "username-asc", label: "Username A→Z" },
+    { value: "username-desc", label: "Username Z→A" },
+  ]
+}
 
 export default function UserManagement() {
   const [userList, setUserList] = useState<User[]>([])
@@ -24,6 +53,7 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("")
   const [genderFilter, setGenderFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
+  const [subscriptionFilter, setSubscriptionFilter] = useState<string>("")
   const [sortBy, setSortBy] = useState<string>("createdat")
   const [isAscending, setIsAscending] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
@@ -37,6 +67,10 @@ export default function UserManagement() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
 
+  // Subscription management modal states
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false)
+  const [isPaymentHistoryModalOpen, setIsPaymentHistoryModalOpen] = useState(false)
+
   const { access_token } = useAppSelector((state) => state.auth)
   const { toast } = useToast()
 
@@ -49,7 +83,7 @@ export default function UserManagement() {
     if (mounted) {
       setPageNumber(1)
     }
-  }, [searchQuery, genderFilter, statusFilter, sortBy, isAscending, mounted])
+  }, [searchQuery, genderFilter, statusFilter, subscriptionFilter, sortBy, isAscending, mounted])
 
   const fetchUserList = async (params: UserListParams = {}) => {
     if (!access_token) return
@@ -101,18 +135,23 @@ export default function UserManagement() {
       params.isActive = statusFilter === "active"
     }
 
+    if (subscriptionFilter) {
+      params.hasActiveSubscription = subscriptionFilter === "premium"
+    }
+
     // Debounce cho search text
     const timeoutId = setTimeout(() => {
       fetchUserList(params)
     }, searchQuery.trim() ? 500 : 0)
 
     return () => clearTimeout(timeoutId)
-  }, [searchQuery, genderFilter, statusFilter, sortBy, isAscending, pageNumber, mounted, access_token])
+  }, [searchQuery, genderFilter, statusFilter, subscriptionFilter, sortBy, isAscending, pageNumber, mounted, access_token])
 
   const handleResetFilters = () => {
     setSearchQuery("")
     setGenderFilter("")
     setStatusFilter("")
+    setSubscriptionFilter("")
     setSortBy("createdat")
     setIsAscending(false)
   }
@@ -135,6 +174,10 @@ export default function UserManagement() {
 
     if (statusFilter) {
       params.isActive = statusFilter === "active"
+    }
+
+    if (subscriptionFilter) {
+      params.hasActiveSubscription = subscriptionFilter === "premium"
     }
 
     fetchUserList(params)
@@ -163,6 +206,29 @@ export default function UserManagement() {
     setIsDetailModalOpen(false)
     setSelectedUserId(null)
     setSelectedUserDetail(null)
+  }
+
+  const handleOpenSubscriptionModal = () => {
+    setIsSubscriptionModalOpen(true)
+  }
+
+  const handleCloseSubscriptionModal = () => {
+    setIsSubscriptionModalOpen(false)
+  }
+
+  const handleOpenPaymentHistoryModal = () => {
+    setIsPaymentHistoryModalOpen(true)
+  }
+
+  const handleClosePaymentHistoryModal = () => {
+    setIsPaymentHistoryModalOpen(false)
+  }
+
+  const handleSubscriptionSuccess = () => {
+    // Refresh user detail
+    if (selectedUserId) {
+      handleViewUser(selectedUserId)
+    }
   }
 
   const handleToggleUserStatus = (user: User) => {
@@ -229,6 +295,10 @@ export default function UserManagement() {
             params.isActive = statusFilter === "active"
           }
 
+          if (subscriptionFilter) {
+            params.hasActiveSubscription = subscriptionFilter === "premium"
+          }
+
           await fetchUserList(params)
           
         } catch (err: any) {
@@ -259,26 +329,6 @@ export default function UserManagement() {
     return new Date(dateString).toLocaleDateString("vi-VN")
   }
 
-  const genderOptions = [
-    { value: "", label: "Tất cả giới tính" },
-    { value: "1", label: "Nam" },
-    { value: "2", label: "Nữ" },
-    { value: "3", label: "Khác" },
-  ]
-
-  const statusOptions = [
-    { value: "", label: "Tất cả trạng thái" },
-    { value: "active", label: "Hoạt động" },
-    { value: "inactive", label: "Bị khóa" },
-  ]
-
-  const sortOptions = [
-    { value: "createdat", label: "Ngày tạo" },
-    { value: "name", label: "Tên" },
-    { value: "email", label: "Email" },
-    { value: "username", label: "Username" },
-  ]
-
   if (error && !isLoading) {
     return (
       <div className="space-y-6">
@@ -298,66 +348,80 @@ export default function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Quản lý người dùng</h2>
-          <p className="text-muted-foreground">Xem, khóa, nâng cấp Premium cho người dùng</p>
+          <p className="text-muted-foreground">
+            Xem, khóa, nâng cấp Premium cho người dùng ({totalCount} người dùng)
+          </p>
         </div>
       </div>
 
       {/* Filters */}
-      <Card className="p-4">
-        <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Tìm kiếm tên, username, email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          
-          <SimpleSelect
-            value={genderFilter}
-            onValueChange={setGenderFilter}
-            options={genderOptions}
-            placeholder="Giới tính"
-            className="w-full md:w-[150px]"
-          />
-          
-          <SimpleSelect
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-            options={statusOptions}
-            placeholder="Trạng thái"
-            className="w-full md:w-[150px]"
-          />
-          
-          <SimpleSelect
-            value={sortBy}
-            onValueChange={setSortBy}
-            options={sortOptions}
-            placeholder="Sắp xếp"
-            className="w-full md:w-[150px]"
-          />
-          
-          <Button
-            variant="outline"
-            onClick={() => setIsAscending(!isAscending)}
-            className="w-full md:w-auto"
-          >
-            {isAscending ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-          </Button>
-          
-          <Button variant="outline" onClick={handleResetFilters} className="w-full md:w-auto">
-            <X className="mr-2 h-4 w-4" />
-            Xóa bộ lọc
-          </Button>
-        </div>
-      </Card>
+      {mounted && (
+        <div className="flex flex-col gap-4 pb-4 border-b">
+          <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm kiếm tên, username, email..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              />
+            </div>
 
-      {/* Results count */}
-      <div className="text-sm text-muted-foreground">
-        Tổng cộng {totalCount} người dùng
-      </div>
+            <SimpleSelect
+              value={genderFilter}
+              onValueChange={setGenderFilter}
+              placeholder="Giới tính"
+              className="w-[130px] shrink-0"
+              options={FILTER_OPTIONS.gender}
+            />
+
+            <SimpleSelect
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+              placeholder="Trạng thái"
+              className="w-[130px] shrink-0"
+              options={FILTER_OPTIONS.status}
+            />
+
+            <SimpleSelect
+              value={subscriptionFilter}
+              onValueChange={setSubscriptionFilter}
+              placeholder="Subscription"
+              className="w-[130px] shrink-0"
+              options={FILTER_OPTIONS.subscription}
+            />
+
+            <SimpleSelect
+              value={`${sortBy}-${isAscending ? 'asc' : 'desc'}`}
+              onValueChange={(value) => {
+                const [field, direction] = value.split('-')
+                setSortBy(field)
+                setIsAscending(direction === 'asc')
+              }}
+              placeholder="Sắp xếp"
+              className="w-[130px] shrink-0"
+              options={FILTER_OPTIONS.sort}
+            />
+
+            <Button 
+              onClick={handleResetFilters} 
+              variant="outline" 
+              size="default"
+              className="shrink-0"
+            >
+              Đặt lại
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Table */}
       <Card>
@@ -369,6 +433,7 @@ export default function UserManagement() {
               <TableHead>Username</TableHead>
               <TableHead>Giới tính</TableHead>
               <TableHead>Trạng thái</TableHead>
+              <TableHead>Subscription</TableHead>
               <TableHead>Ngày tham gia</TableHead>
               <TableHead className="text-right">Thao tác</TableHead>
             </TableRow>
@@ -376,13 +441,13 @@ export default function UserManagement() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   Đang tải danh sách người dùng...
                 </TableCell>
               </TableRow>
             ) : userList.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   Không tìm thấy người dùng nào.
                 </TableCell>
               </TableRow>
@@ -415,6 +480,11 @@ export default function UserManagement() {
                       {user.is_active ? "Hoạt động" : "Bị khóa"}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge variant={user.has_active_subscription ? "default" : "secondary"}>
+                      {user.has_active_subscription ? "Premium" : "Free"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{formatDate(user.created_at)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -431,7 +501,7 @@ export default function UserManagement() {
                         </DropdownMenuItem>
                         <DropdownMenuItem>
                           <Crown className="mr-2 h-4 w-4" />
-                          Nâng cấp Premium
+                          Re-subscription
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleToggleUserStatus(user)}>
@@ -540,25 +610,102 @@ export default function UserManagement() {
                 </div>
 
                 {/* Subscription Info */}
-                {selectedUserDetail.subscription && (
-                  <div className="border-t pt-4">
-                    <h5 className="font-semibold mb-2">Thông tin Premium</h5>
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Crown className="h-4 w-4 text-yellow-600" />
-                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
-                          {selectedUserDetail.subscription.subscription.name}
-                        </span>
-                        <Badge variant={selectedUserDetail.subscription.is_active ? "default" : "secondary"}>
-                          {selectedUserDetail.subscription.is_active ? "Đang hoạt động" : "Hết hạn"}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                        Từ {formatDate(selectedUserDetail.subscription.start_date)} đến {formatDate(selectedUserDetail.subscription.end_date)}
-                      </p>
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="font-semibold">Thông tin Subscription</h5>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={handleOpenSubscriptionModal}>
+                        <Crown className="h-3 w-3 mr-1" />
+                        Quản lý Premium
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleOpenPaymentHistoryModal}>
+                        Lịch sử thanh toán
+                      </Button>
                     </div>
                   </div>
-                )}
+
+                  {selectedUserDetail.subscription ? (
+                    <div className="space-y-4">
+                      {/* Current Subscription */}
+                      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <Crown className="h-5 w-5 text-yellow-600" />
+                            <span className="font-semibold text-yellow-800 dark:text-yellow-200">
+                              {selectedUserDetail.subscription.subscription.name}
+                            </span>
+                          </div>
+                          <Badge variant={selectedUserDetail.subscription.is_active ? "default" : "destructive"}>
+                            {selectedUserDetail.subscription.is_active ? "Đang hoạt động" : "Hết hạn"}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Giá:</span>
+                            <p className="font-medium">{selectedUserDetail.subscription.subscription.price.toLocaleString()} VND</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Thời hạn:</span>
+                            <p className="font-medium">{selectedUserDetail.subscription.subscription.duration_days} ngày</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Ngày bắt đầu:</span>
+                            <p className="font-medium">{formatDate(selectedUserDetail.subscription.start_date)}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Ngày hết hạn:</span>
+                            <p className="font-medium">{formatDate(selectedUserDetail.subscription.end_date)}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Tự động gia hạn:</span>
+                            <p className="font-medium">
+                              <Badge variant={selectedUserDetail.subscription.auto_renew ? "default" : "secondary"}>
+                                {selectedUserDetail.subscription.auto_renew ? "Có" : "Không"}
+                              </Badge>
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Còn lại:</span>
+                            <p className="font-medium">
+                              {Math.max(0, Math.ceil((new Date(selectedUserDetail.subscription.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} ngày
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Features */}
+                        {selectedUserDetail.subscription.subscription.features && selectedUserDetail.subscription.subscription.features.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-yellow-200 dark:border-yellow-700">
+                            <span className="text-sm text-muted-foreground">Tính năng:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {selectedUserDetail.subscription.subscription.features.map((feature, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {feature}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Description */}
+                        {selectedUserDetail.subscription.subscription.description && (
+                          <div className="mt-3 pt-3 border-t border-yellow-200 dark:border-yellow-700">
+                            <span className="text-sm text-muted-foreground">Mô tả:</span>
+                            <p className="text-sm mt-1">{selectedUserDetail.subscription.subscription.description}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center">
+                      <Crown className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-muted-foreground text-sm">Người dùng chưa có gói Premium</p>
+                      <Button size="sm" variant="outline" className="mt-2" onClick={handleOpenSubscriptionModal}>
+                        Tặng Premium
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
                 {/* System Info */}
                 <div className="border-t pt-4 text-sm text-muted-foreground">
@@ -581,6 +728,26 @@ export default function UserManagement() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Subscription Management Modal */}
+      {selectedUserDetail && (
+        <SubscriptionManagementModal
+          userDetail={selectedUserDetail}
+          isOpen={isSubscriptionModalOpen}
+          onClose={handleCloseSubscriptionModal}
+          onSuccess={handleSubscriptionSuccess}
+        />
+      )}
+
+      {/* Payment History Modal */}
+      {selectedUserId && selectedUserDetail && (
+        <PaymentHistoryModal
+          userId={selectedUserId}
+          userName={selectedUserDetail.full_name || selectedUserDetail.username}
+          isOpen={isPaymentHistoryModalOpen}
+          onClose={handleClosePaymentHistoryModal}
+        />
       )}
     </div>
   )
