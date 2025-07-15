@@ -128,6 +128,17 @@ export interface BookListResponse {
   hasNextPage: boolean
 }
 
+export interface BookStatistics {
+  pending_count: number
+  approved_count: number
+  rejected_count: number
+  total_count: number
+  active_count: number
+  inactive_count: number
+  premium_count: number
+  free_count: number
+}
+
 export const booksApi = {
   // Tạo sách mới từ EPUB
   create: async (data: CreateBookRequest) => {
@@ -267,6 +278,18 @@ export const booksApi = {
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
       throw new Error(result.message || "Xóa sách thất bại")
+    }
+
+    return result.data
+  },
+
+  // Lấy thống kê sách
+  getStatistics: async (): Promise<BookStatistics> => {
+    const response = await authFetch(getApiUrl(config.api.books.statistics))
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy thống kê sách thất bại")
     }
 
     return result.data
