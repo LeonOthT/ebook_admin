@@ -1,4 +1,5 @@
-const API_BASE = "https://booklify-api-fhhjg3asgwhxgfhd.southeastasia-01.azurewebsites.net/api/cms"
+import { getApiUrl, config, devLog, authFetch } from "@/lib/config"
+import { referenceApi, type DropdownOption } from "./reference"
 
 export interface BookCategory {
   id: string
@@ -12,6 +13,12 @@ export interface BookCategory {
 export interface CreateCategoryRequest {
   name: string
   description: string
+}
+
+export interface UpdateCategoryRequest {
+  name?: string
+  description?: string
+  isActive?: boolean
 }
 
 export interface CategoryListParams {
@@ -36,12 +43,11 @@ export interface CategoryListResponse {
 
 export const categoriesApi = {
   // Tạo danh mục sách mới
-  create: async (data: CreateCategoryRequest, token: string): Promise<BookCategory> => {
-    const response = await fetch(`${API_BASE}/book-categories`, {
+  create: async (data: CreateCategoryRequest): Promise<BookCategory> => {
+    const response = await authFetch(getApiUrl(config.api.categories.create), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(data),
     })
@@ -55,7 +61,7 @@ export const categoriesApi = {
   },
 
   // Lấy danh sách danh mục với lọc, sắp xếp và phân trang
-  getList: async (params: CategoryListParams, token: string): Promise<CategoryListResponse> => {
+  getList: async (params: CategoryListParams): Promise<CategoryListResponse> => {
     const searchParams = new URLSearchParams()
     
     if (params.name) searchParams.append("name", params.name)
@@ -66,13 +72,10 @@ export const categoriesApi = {
     if (params.pageNumber) searchParams.append("pageNumber", params.pageNumber.toString())
     if (params.pageSize) searchParams.append("pageSize", params.pageSize.toString())
 
-    const url = `${API_BASE}/book-categories/list${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+    const url = getApiUrl(`${config.api.categories.list}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`)
+    devLog("Categories list API request URL:", url)
     
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const response = await authFetch(url)
 
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
@@ -91,12 +94,8 @@ export const categoriesApi = {
   },
 
   // Lấy danh sách danh mục (phương thức cũ - giữ để tương thích)
-  getAll: async (token: string): Promise<BookCategory[]> => {
-    const response = await fetch(`${API_BASE}/book-categories`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+  getAll: async (): Promise<BookCategory[]> => {
+    const response = await authFetch(getApiUrl(config.api.categories.getAll))
 
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
@@ -104,5 +103,52 @@ export const categoriesApi = {
     }
 
     return result.data
+  },
+
+  // Lấy chi tiết danh mục theo ID
+  getById: async (id: string): Promise<BookCategory> => {
+    const response = await authFetch(getApiUrl(config.api.categories.getById(id)))
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy thông tin danh mục thất bại")
+    }
+
+    return result.data
+  },
+
+  // Cập nhật danh mục
+  update: async (id: string, data: UpdateCategoryRequest): Promise<BookCategory> => {
+    const response = await authFetch(getApiUrl(config.api.categories.update(id)), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Cập nhật danh mục thất bại")
+    }
+
+    return result.data
+  },
+
+  // Xóa danh mục
+  delete: async (id: string): Promise<void> => {
+    const response = await authFetch(getApiUrl(config.api.categories.delete(id)), {
+      method: "DELETE",
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Xóa danh mục thất bại")
+    }
+  },
+
+  // Lấy danh sách categories cho dropdown (sử dụng reference API)
+  getForDropdown: async (): Promise<DropdownOption[]> => {
+    return await referenceApi.getBookCategories()
   },
 }

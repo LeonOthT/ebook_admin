@@ -1,19 +1,15 @@
-const API_BASE = "https://booklify-api-fhhjg3asgwhxgfhd.southeastasia-01.azurewebsites.net/api/cms"
+import { getApiUrl, config, devLog, authFetch } from "@/lib/config"
 
 export interface CreateBookRequest {
   file: File
-  title: string
-  description?: string
-  author: string
-  isbn?: string
-  publisher?: string
   category_id: string
   is_premium?: boolean
   tags?: string
-  published_date?: string
+  isbn?: string
 }
 
 export interface BookStatusRequest {
+  status?: 0 | 1 // 0: Inactive, 1: Active
   approval_status?: 0 | 1 | 2 // 0: Pending, 1: Approved, 2: Rejected
   approval_note?: string
   is_premium?: boolean
@@ -24,32 +20,100 @@ export interface Book {
   title: string
   author: string
   description: string
+  category_id: string
   category_name: string
+  approval_status: 0 | 1 | 2 // 0: Pending, 1: Approved, 2: Rejected
+  approval_status_string: string // String representation
+  status: 0 | 1 // 0: Inactive, 1: Active
+  status_string: string // String representation
   cover_image_url: string
   is_premium: boolean
-  has_chapters: boolean
   average_rating: number
   total_ratings: number
   total_views: number
   published_date: string
+  created_at: string
+}
+
+export interface BookDetail extends Book {
+  isbn?: string
+  publisher?: string
+  status: 0 | 1 // 0: Inactive, 1: Active
+  status_string: string // String representation
+  has_chapters: boolean
+  tags?: string
+  file_path?: string
+  file_url?: string
+  page_count: number
+  modified_at: string
+  approval_note?: string
+}
+
+export interface BookDetailResponse {
+  id: string
+  title: string
+  author: string
+  description: string
+  category_id: string
+  category_name: string
+  approval_status: 0 | 1 | 2 // 0: Pending, 1: Approved, 2: Rejected
+  approval_status_string: string // String representation
+  cover_image_url: string
+  is_premium: boolean
+  average_rating: number
+  total_ratings: number
+  total_views: number
+  published_date: string
+  created_at: string
+  isbn?: string
+  publisher?: string
+  status: 0 | 1 // 0: Inactive, 1: Active
+  status_string: string // String representation
+  has_chapters: boolean
+  tags?: string
+  file_path?: string
+  file_url?: string
+  page_count: number
+  modified_at: string
+  approval_note?: string
+}
+
+export interface ChapterResponse {
+  id: string
+  title: string
+  order: number
+  href?: string
+  cfi?: string
+  parent_chapter_id?: string
+  child_chapters?: ChapterResponse[]
 }
 
 export interface BookListParams {
-  title?: string
-  author?: string
+  // Tìm kiếm kết hợp tất cả trường text (title, author, isbn, publisher, tags)
+  search?: string
+  // Lọc theo danh mục
   categoryId?: string
+  // Lọc theo trạng thái phê duyệt (0: Pending, 1: Approved, 2: Rejected)
+  approvalStatus?: 0 | 1 | 2
+  // Lọc theo trạng thái sách (0: Active, 1: Inactive)
+  status?: 0 | 1
+  // Lọc theo loại sách có phí
   isPremium?: boolean
+  // Lọc theo sách có chapters
   hasChapters?: boolean
+  // Lọc theo khoảng ngày xuất bản
   publishedDateFrom?: string
   publishedDateTo?: string
-  search?: string
+  // Lọc theo rating
   minRating?: number
   maxRating?: number
   minTotalRatings?: number
   minTotalViews?: number
   maxTotalViews?: number
-  sortBy?: "title" | "author" | "createdat" | "rating" | "totalratings" | "totalviews"
+  // Sắp xếp
+  sortBy?: "title" | "author" | "isbn" | "publisher" | "approvalstatus" | "status" | "ispremium" | "pagecount" | "publisheddate" | "createdat" | "rating" | "totalratings" | "totalviews"
   isAscending?: boolean
+  // Phân trang
   pageNumber?: number
   pageSize?: number
 }
@@ -64,28 +128,31 @@ export interface BookListResponse {
   hasNextPage: boolean
 }
 
+export interface BookStatistics {
+  pending_count: number
+  approved_count: number
+  rejected_count: number
+  total_count: number
+  active_count: number
+  inactive_count: number
+  premium_count: number
+  free_count: number
+}
+
 export const booksApi = {
-  // Tạo sách mới
-  create: async (data: CreateBookRequest, token: string) => {
+  // Tạo sách mới từ EPUB
+  create: async (data: CreateBookRequest) => {
     const formData = new FormData()
 
     formData.append("file", data.file)
-    formData.append("title", data.title)
-    formData.append("author", data.author)
     formData.append("category_id", data.category_id)
 
-    if (data.description) formData.append("description", data.description)
-    if (data.isbn) formData.append("isbn", data.isbn)
-    if (data.publisher) formData.append("publisher", data.publisher)
     if (data.is_premium !== undefined) formData.append("is_premium", data.is_premium.toString())
     if (data.tags) formData.append("tags", data.tags)
-    if (data.published_date) formData.append("published_date", data.published_date)
+    if (data.isbn) formData.append("isbn", data.isbn)
 
-    const response = await fetch(`${API_BASE}/books`, {
+    const response = await authFetch(getApiUrl(config.api.books.create), {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
       body: formData,
     })
 
@@ -97,19 +164,38 @@ export const booksApi = {
     return result.data
   },
 
-  // Cập nhật trạng thái sách (chỉ Admin)
-  updateStatus: async (bookId: string, data: BookStatusRequest, token: string) => {
-    const response = await fetch(`${API_BASE}/books/${bookId}/manage-status`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
+  // Cập nhật sách
+  update: async (bookId: string, updateData: FormData) => {
+    const response = await authFetch(getApiUrl(config.api.books.update(bookId)), {
+      method: "PATCH",
+      body: updateData,
     })
 
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Cập nhật sách thất bại")
+    }
+
+    return result.data
+  },
+
+  // Cập nhật trạng thái sách (chỉ Admin)
+  updateStatus: async (bookId: string, data: BookStatusRequest) => {
+    const response = await authFetch(getApiUrl(config.api.books.updateStatus(bookId)), {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      const result = await response.json()
+      throw new Error(result.message || "Cập nhật trạng thái sách thất bại")
+    }
+
+    const result = await response.json()
+    if (result.result !== "success") {
       throw new Error(result.message || "Cập nhật trạng thái sách thất bại")
     }
 
@@ -117,17 +203,17 @@ export const booksApi = {
   },
 
   // Lấy danh sách sách với lọc, sắp xếp và phân trang
-  getList: async (params: BookListParams, token: string): Promise<BookListResponse> => {
+  getList: async (params: BookListParams): Promise<BookListResponse> => {
     const searchParams = new URLSearchParams()
     
-    if (params.title) searchParams.append("title", params.title)
-    if (params.author) searchParams.append("author", params.author)
+    if (params.search) searchParams.append("search", params.search)
     if (params.categoryId) searchParams.append("categoryId", params.categoryId)
+    if (params.approvalStatus !== undefined) searchParams.append("approvalStatus", params.approvalStatus.toString())
+    if (params.status !== undefined) searchParams.append("status", params.status.toString())
     if (params.isPremium !== undefined) searchParams.append("isPremium", params.isPremium.toString())
     if (params.hasChapters !== undefined) searchParams.append("hasChapters", params.hasChapters.toString())
     if (params.publishedDateFrom) searchParams.append("publishedDateFrom", params.publishedDateFrom)
     if (params.publishedDateTo) searchParams.append("publishedDateTo", params.publishedDateTo)
-    if (params.search) searchParams.append("search", params.search)
     if (params.minRating !== undefined) searchParams.append("minRating", params.minRating.toString())
     if (params.maxRating !== undefined) searchParams.append("maxRating", params.maxRating.toString())
     if (params.minTotalRatings !== undefined) searchParams.append("minTotalRatings", params.minTotalRatings.toString())
@@ -138,13 +224,10 @@ export const booksApi = {
     if (params.pageNumber) searchParams.append("pageNumber", params.pageNumber.toString())
     if (params.pageSize) searchParams.append("pageSize", params.pageSize.toString())
 
-    const url = `${API_BASE}/books/list${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+    const url = getApiUrl(`${config.api.books.list}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`)
+    devLog("Books API request URL:", url)
     
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const response = await authFetch(url)
 
     const result = await response.json()
     if (!response.ok || result.result !== "success") {
@@ -160,5 +243,55 @@ export const booksApi = {
       hasPreviousPage: result.data.hasPreviousPage,
       hasNextPage: result.data.hasNextPage,
     }
+  },
+
+  // Lấy thông tin chi tiết sách (không có chapters)
+  getDetail: async (bookId: string): Promise<BookDetailResponse> => {
+    const response = await authFetch(getApiUrl(config.api.books.getDetail(bookId)))
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy thông tin sách thất bại")
+    }
+
+    return result.data
+  },
+
+  // Lấy danh sách chapters của sách
+  getChapters: async (bookId: string): Promise<ChapterResponse[]> => {
+    const response = await authFetch(getApiUrl(config.api.books.getChapters(bookId)))
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy danh sách chapters thất bại")
+    }
+
+    return result.data
+  },
+
+  // Xóa sách (chỉ Admin)
+  delete: async (bookId: string) => {
+    const response = await authFetch(getApiUrl(config.api.books.delete(bookId)), {
+      method: "DELETE",
+    })
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Xóa sách thất bại")
+    }
+
+    return result.data
+  },
+
+  // Lấy thống kê sách
+  getStatistics: async (): Promise<BookStatistics> => {
+    const response = await authFetch(getApiUrl(config.api.books.statistics))
+
+    const result = await response.json()
+    if (!response.ok || result.result !== "success") {
+      throw new Error(result.message || "Lấy thống kê sách thất bại")
+    }
+
+    return result.data
   },
 }
