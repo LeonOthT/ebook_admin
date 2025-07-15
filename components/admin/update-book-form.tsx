@@ -68,8 +68,8 @@ export default function UpdateBookForm({ bookId, bookData, trigger, open: extern
 
   // Load categories
   const loadCategories = async () => {
-    if (categoriesLoadingRef.current || hasLoadedCategoriesRef.current) {
-      console.log("Categories already loaded or loading for update modal, skipping")
+    if (categoriesLoadingRef.current) {
+      console.log("Categories already loading for update modal, skipping")
       return
     }
     
@@ -95,70 +95,63 @@ export default function UpdateBookForm({ bookId, bookData, trigger, open: extern
     }
   }
 
-  // Reset session when modal opens/closes
+  // Load data when modal opens
   useEffect(() => {
-    if (open) {
-      const sessionId = `${Date.now()}-${Math.random()}`
-      modalSessionRef.current = sessionId
-      console.log("Update book modal opened, session:", sessionId)
-      
-      // Load categories if not already loaded
-      if (!hasLoadedCategoriesRef.current) {
-        loadCategories()
-      }
-    } else {
-      // Reset refs when modal closes to allow fresh data on next open
-      hasLoadedCategoriesRef.current = false
-      hasLoadedBookDataRef.current = false
-      modalSessionRef.current = null
-      console.log("Update book modal closed, refs reset")
-    }
-  }, [open])
-
-  // Fetch latest book data when modal opens
-  useEffect(() => {
-    const fetchLatestBookData = async () => {
-      if (open && access_token && 
-          !bookDataLoadingRef.current && !hasLoadedBookDataRef.current) {
+    const loadModalData = async () => {
+      if (open) {
+        const sessionId = `${Date.now()}-${Math.random()}`
+        modalSessionRef.current = sessionId
+        console.log("Update book modal opened, session:", sessionId)
         
-        // Prioritize bookId over bookData to get fresh data
-        const targetBookId = bookId || bookData?.id
-        if (!targetBookId) return
+        // Load categories first
+        await loadCategories()
         
-        bookDataLoadingRef.current = true
-        hasLoadedBookDataRef.current = true
-        setFetchingBookData(true)
-        
-        try {
-          devLog("Fetching latest book data for update...")
-          const latestData = await booksApi.getDetail(targetBookId)
-          setLatestBookData(latestData)
-          devLog("Fetched latest book data for update:", latestData)
-        } catch (err: any) {
-          console.error("Error fetching latest book data:", err)
-          toast({
-            title: "Lỗi!",
-            description: err.message || "Có lỗi xảy ra khi tải thông tin sách mới nhất.",
-            variant: "destructive",
-          })
-          // Use the original bookData from props as fallback
-          if (bookData) {
-            setLatestBookData(bookData)
+        // Then load book data if needed
+        if (access_token && !bookDataLoadingRef.current && !hasLoadedBookDataRef.current) {
+          const targetBookId = bookId || bookData?.id
+          if (!targetBookId) return
+          
+          bookDataLoadingRef.current = true
+          hasLoadedBookDataRef.current = true
+          setFetchingBookData(true)
+          
+          try {
+            devLog("Fetching latest book data for update...")
+            const latestData = await booksApi.getDetail(targetBookId)
+            setLatestBookData(latestData)
+            devLog("Fetched latest book data for update:", latestData)
+          } catch (err: any) {
+            console.error("Error fetching latest book data:", err)
+            toast({
+              title: "Lỗi!",
+              description: err.message || "Có lỗi xảy ra khi tải thông tin sách mới nhất.",
+              variant: "destructive",
+            })
+            // Use the original bookData from props as fallback
+            if (bookData) {
+              setLatestBookData(bookData)
+            }
+          } finally {
+            bookDataLoadingRef.current = false
+            setFetchingBookData(false)
           }
-        } finally {
-          bookDataLoadingRef.current = false
-          setFetchingBookData(false)
         }
+      } else {
+        // Reset refs when modal closes to allow fresh data on next open
+        hasLoadedCategoriesRef.current = false
+        hasLoadedBookDataRef.current = false
+        modalSessionRef.current = null
+        console.log("Update book modal closed, refs reset")
       }
     }
 
-    fetchLatestBookData()
-  }, [bookId, bookData, open, access_token, toast])
+    loadModalData()
+  }, [open, bookId, bookData, access_token, toast])
 
-  // Initialize form data using latest book data
+  // Initialize form data using latest book data (only when categories are also loaded)
   useEffect(() => {
-    if (latestBookData && open) {
-      setFormData({
+    if (latestBookData && open && categories.length > 0) {
+      const newFormData = {
         category_id: latestBookData.category_id || "",
         tags: latestBookData.tags || "",
         isbn: latestBookData.isbn || "",
@@ -167,9 +160,11 @@ export default function UpdateBookForm({ bookId, bookData, trigger, open: extern
         author: latestBookData.author || "",
         publisher: latestBookData.publisher || "",
         published_date: latestBookData.published_date ? new Date(latestBookData.published_date).toISOString().split('T')[0] : "",
-      })
+      }
+      devLog("Setting form data with book data")
+      setFormData(newFormData)
     }
-  }, [latestBookData, open])
+  }, [latestBookData, open, categories])
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen)
@@ -389,19 +384,32 @@ export default function UpdateBookForm({ bookId, bookData, trigger, open: extern
                 
                 <div>
                   <Label htmlFor="category">Danh mục sách (bắt buộc)</Label>
-                  <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn danh mục sách" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.value} value={category.value}>
-                          {category.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  {categories.length > 0 ? (
+                    <Select 
+                      key={`category-select-${categories.length}-${formData.category_id}`}
+                      value={formData.category_id} 
+                      onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue 
+                          placeholder="Chọn danh mục sách"
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.value} value={category.value}>
+                            {category.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex items-center space-x-2 p-2 border rounded">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Đang tải danh mục...</span>
+                    </div>
+                                      )}
+                  </div>
 
                 <div>
                   <Label htmlFor="isbn">ISBN</Label>
