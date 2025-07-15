@@ -1,8 +1,8 @@
 // Cấu hình môi trường cho ứng dụng
 export const config = {
   // API Base URLs
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7001/api/cms',
-  referenceApiBaseUrl: process.env.NEXT_PUBLIC_REFERENCE_API_BASE_URL || 'http://localhost:7001/api/common/reference',
+  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5123/api/cms',
+  referenceApiBaseUrl: process.env.NEXT_PUBLIC_REFERENCE_API_BASE_URL || 'http://localhost:5123/api/common/reference',
   
   // API Endpoints
   api: {
@@ -24,6 +24,7 @@ export const config = {
       getDetail: (bookId: string) => `/books/${bookId}`,
       getChapters: (bookId: string) => `/books/${bookId}/chapters`,
       delete: (bookId: string) => `/books/${bookId}`,
+      statistics: '/books/statistics',
     },
     categories: {
       list: '/book-categories/list',
@@ -37,6 +38,14 @@ export const config = {
       list: '/users/list',
       getById: (userId: string) => `/users/${userId}`,
       updateStatus: (userId: string) => `/users/${userId}/status`,
+    },
+    subscriptions: {
+      list: '/subscription',
+      create: '/subscription',
+      getById: (subscriptionId: string) => `/subscription/${subscriptionId}`,
+      update: (subscriptionId: string) => `/subscription/${subscriptionId}`,
+      delete: (subscriptionId: string) => `/subscription/${subscriptionId}`,
+      statistics: '/subscription/statistics',
     },
   },
   
