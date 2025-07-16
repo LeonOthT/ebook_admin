@@ -25,6 +25,7 @@ export const config = {
       getDetail: (bookId: string) => `/books/${bookId}`,
       getChapters: (bookId: string) => `/books/${bookId}/chapters`,
       delete: (bookId: string) => `/books/${bookId}`,
+      download: (bookId: string) => `/books/${bookId}/download`,
       statistics: '/books/statistics',
     },
     categories: {

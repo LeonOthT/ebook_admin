@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Search, MoreHorizontal, Eye, Edit, Trash2, Loader2, Settings, RotateCw, AlertCircle, Clock, History } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Search, MoreHorizontal, Eye, Edit, Trash2, Loader2, Settings, RotateCw, AlertCircle, Clock, History, Download, BookOpen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -89,6 +90,7 @@ export default function BookManagement() {
 
   const { access_token, user } = useAppSelector((state) => state.auth)
   const { toast } = useToast()
+  const router = useRouter()
 
   // Kiểm tra quyền Admin và Staff
   const isAdmin = user?.app_role?.includes("Admin") || false
@@ -261,6 +263,41 @@ export default function BookManagement() {
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false)
     setSelectedBookForEdit(null)
+  }
+
+  const handleReadBook = (bookId: string) => {
+    const url = `/read/${bookId}`
+    window.open(url, '_blank')
+  }
+
+  const handleDownloadBook = async (book: Book) => {
+    if (!access_token) return
+
+    try {
+      const blob = await booksApi.download(book.id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = `${book.title}.epub`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast({
+        title: "Thành công!",
+        description: `Đã tải xuống sách "${book.title}".`,
+        variant: "default",
+      })
+    } catch (err: any) {
+      console.error("Error downloading book:", err)
+      toast({
+        title: "Lỗi!",
+        description: err.message || "Có lỗi xảy ra khi tải xuống sách.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDeleteBook = (book: Book) => {
@@ -898,43 +935,51 @@ export default function BookManagement() {
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewBook(book.id)}>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  Xem chi tiết
+                                                          <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewBook(book.id)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Xem chi tiết
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleReadBook(book.id)}>
+                                <BookOpen className="mr-2 h-4 w-4" />
+                                Đọc sách
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDownloadBook(book)}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Tải xuống
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditBook(book.id)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Chỉnh sửa
+                              </DropdownMenuItem>
+                              {isStaff && book.approval_status === 2 && (
+                                <DropdownMenuItem onClick={() => handleResubmitBook(book)}>
+                                  <RotateCw className="mr-2 h-4 w-4" />
+                                  Resubmit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEditBook(book.id)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Chỉnh sửa
+                              )}
+                              {isAdmin && (
+                                <DropdownMenuItem onClick={() => bookStatusModal.openModal({
+                                  bookId: book.id,
+                                  bookTitle: book.title,
+                                  currentBookStatus: book.status,
+                                  currentApprovalStatus: book.approval_status,
+                                  currentPremium: book.is_premium,
+                                })}>
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  Quản lý trạng thái
                                 </DropdownMenuItem>
-                                                               {isStaff && book.approval_status === 2 && (
-                                 <DropdownMenuItem onClick={() => handleResubmitBook(book)}>
-                                   <RotateCw className="mr-2 h-4 w-4" />
-                                   Resubmit
-                                 </DropdownMenuItem>
-                               )}
-                                {isAdmin && (
-                                  <DropdownMenuItem onClick={() => bookStatusModal.openModal({
-                                    bookId: book.id,
-                                    bookTitle: book.title,
-                                    currentBookStatus: book.status,
-                                    currentApprovalStatus: book.approval_status,
-                                    currentPremium: book.is_premium,
-                                  })}>
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    Quản lý trạng thái
-                                  </DropdownMenuItem>
-                                )}
-                                {isAdmin && (
-                                  <DropdownMenuItem 
-                                    className="text-red-600" 
-                                    onClick={() => handleDeleteBook(book)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Xóa sách
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
+                              )}
+                              {isAdmin && (
+                                <DropdownMenuItem 
+                                  className="text-red-600" 
+                                  onClick={() => handleDeleteBook(book)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Xóa sách
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
@@ -1183,6 +1228,14 @@ export default function BookManagement() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 Xem chi tiết
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleReadBook(book.id)}>
+                                <BookOpen className="mr-2 h-4 w-4" />
+                                Đọc sách
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDownloadBook(book)}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Tải xuống
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleEditBook(book.id)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Chỉnh sửa
@@ -1301,6 +1354,7 @@ export default function BookManagement() {
           <div />
         </BookStatusModal>
       )}
+
     </div>
   )
 }
