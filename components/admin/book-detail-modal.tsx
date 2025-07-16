@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Loader2, Book, FileText, Calendar, Tag, User, Building, Eye, Star, Users, AlertCircle, RotateCw, MessageSquare, CheckCircle } from "lucide-react"
+import { Loader2, Book, FileText, Calendar, Tag, User, Building, Eye, Star, Users, AlertCircle, RotateCw, MessageSquare, CheckCircle, Download, BookOpen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -113,6 +113,43 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
       setShowChapters(false)
     } else {
       fetchBookChapters()
+    }
+  }
+
+  const handleDownload = async () => {
+    if (!bookId || !bookDetail || !access_token) return
+
+    try {
+      const blob = await booksApi.download(bookId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = `${bookDetail.title}.epub`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast({
+        title: "Thành công!",
+        description: "Đã tải xuống sách.",
+        variant: "default",
+      })
+    } catch (err: any) {
+      console.error("Error downloading book:", err)
+      toast({
+        title: "Lỗi!",
+        description: err.message || "Có lỗi xảy ra khi tải xuống sách.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleReadBook = () => {
+    if (bookId) {
+      const url = `/read/${bookId}`
+      window.open(url, '_blank')
     }
   }
 
@@ -309,6 +346,28 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownload}
+                      disabled={!access_token}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Tải xuống
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleReadBook}
+                      disabled={!bookDetail.file_url}
+                    >
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Đọc sách
+                    </Button>
                   </div>
 
                   <div className="space-y-2">
