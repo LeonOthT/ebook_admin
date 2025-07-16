@@ -15,6 +15,10 @@ export interface BookStatusRequest {
   is_premium?: boolean
 }
 
+export interface ResubmitBookRequest {
+  resubmit_note?: string
+}
+
 export interface Book {
   id: string
   title: string
@@ -33,6 +37,7 @@ export interface Book {
   total_views: number
   published_date: string
   created_at: string
+  approval_note?: string // Available for resubmitted books
 }
 
 export interface BookDetail extends Book {
@@ -293,5 +298,29 @@ export const booksApi = {
     }
 
     return result.data
+  },
+
+  // Resubmit sách bị từ chối (Staff/Admin)
+  resubmit: async (bookId: string, data: ResubmitBookRequest) => {
+    const response = await authFetch(getApiUrl(config.api.books.resubmit(bookId)), {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      const result = await response.json()
+      throw new Error(result.message || "Resubmit sách thất bại")
+    }
+
+    const result = await response.json()
+    if (result.result !== "success") {
+      throw new Error(result.message || "Resubmit sách thất bại")
+    }
+
+    // API chỉ trả về Result (success/failure), không có data
+    return result
   },
 }

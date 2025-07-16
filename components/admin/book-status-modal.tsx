@@ -183,18 +183,25 @@ export default function BookStatusModal({
                   <SelectValue placeholder="Chọn trạng thái" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                      <span>Chờ duyệt</span>
-                    </div>
-                  </SelectItem>
+                  {/* Chỉ hiển thị "Chờ duyệt" nếu đang ở trạng thái Pending */}
+                  {currentApprovalStatus === 0 && (
+                    <SelectItem value="0">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                        <span>Chờ duyệt</span>
+                      </div>
+                    </SelectItem>
+                  )}
+                  
+                  {/* Luôn hiển thị "Đã duyệt" */}
                   <SelectItem value="1">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-500"></div>
                       <span>Đã duyệt</span>
                     </div>
                   </SelectItem>
+                  
+                  {/* Luôn hiển thị "Từ chối" */}
                   <SelectItem value="2">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-red-500"></div>
@@ -203,6 +210,13 @@ export default function BookStatusModal({
                   </SelectItem>
                 </SelectContent>
               </Select>
+              
+              {/* Hiển thị lưu ý về logic */}
+              {currentApprovalStatus !== 0 && (
+                <p className="text-xs text-muted-foreground">
+                  💡 Không thể quay về "Chờ duyệt" sau khi đã xử lý. Chỉ có thể chuyển giữa "Đã duyệt" và "Từ chối".
+                </p>
+              )}
             </div>
 
             <div className="grid gap-2">

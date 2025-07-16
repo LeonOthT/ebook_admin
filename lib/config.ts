@@ -21,6 +21,7 @@ export const config = {
       create: '/books',
       update: (bookId: string) => `/books/${bookId}`,
       updateStatus: (bookId: string) => `/books/${bookId}/manage-status`,
+      resubmit: (bookId: string) => `/books/${bookId}/resubmit`,
       getDetail: (bookId: string) => `/books/${bookId}`,
       getChapters: (bookId: string) => `/books/${bookId}/chapters`,
       delete: (bookId: string) => `/books/${bookId}`,

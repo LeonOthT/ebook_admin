@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Settings, Loader2, Eye, Edit } from "lucide-react"
+import { Settings, Loader2, Eye, Edit, RotateCw } from "lucide-react"
 
 import { useAppSelector } from "@/lib/hooks"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -354,7 +354,18 @@ export default function ApprovalManagement() {
         <CardHeader>
           <CardTitle>Danh sách sách ({totalCount})</CardTitle>
           <CardDescription>
-            {approvalStatusFilter === "0" ? "Ưu tiên xử lý các sách chờ duyệt" : "Danh sách sách theo trạng thái đã chọn"}
+            {approvalStatusFilter === "0" ? (
+              <div className="space-y-1">
+                <p>Ưu tiên xử lý các sách chờ duyệt.</p>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1">
+                    <RotateCw className="h-3 w-3 text-blue-500" />
+                    <span className="text-blue-600 font-medium">Resubmitted:</span>
+                    <span className="text-muted-foreground">Sách đã được gửi lại sau khi bị từ chối</span>
+                  </div>
+                </div>
+              </div>
+            ) : "Danh sách sách theo trạng thái đã chọn"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -424,16 +435,24 @@ export default function ApprovalManagement() {
                         <Badge variant="outline">{book.category_name}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={
-                            book.approval_status === 1 ? "default" : 
-                            book.approval_status === 2 ? "destructive" : "secondary"
-                          }
-                        >
-                          {book.approval_status === 0 ? "Chờ duyệt" : 
-                           book.approval_status === 1 ? "Đã duyệt" : 
-                           "Từ chối"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              book.approval_status === 1 ? "default" : 
+                              book.approval_status === 2 ? "destructive" : "secondary"
+                            }
+                          >
+                            {book.approval_status === 0 ? "Chờ duyệt" : 
+                             book.approval_status === 1 ? "Đã duyệt" : 
+                             "Từ chối"}
+                          </Badge>
+                          {book.approval_status === 0 && book.approval_note?.includes("[RESUBMITTED]") && (
+                            <div className="flex items-center gap-1">
+                              <RotateCw className="h-3 w-3 text-blue-500" />
+                              <span className="text-xs text-blue-600 font-medium">Resubmitted</span>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{formatDate(book.created_at)}</TableCell>
                       <TableCell className="text-right">
