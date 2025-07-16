@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Loader2, Book, FileText, Calendar, Tag, User, Building, Eye, Star, Users } from "lucide-react"
+import { Loader2, Book, FileText, Calendar, Tag, User, Building, Eye, Star, Users, AlertCircle, RotateCw, MessageSquare, CheckCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/lib/hooks/use-toast"
 import { useAppSelector } from "@/lib/hooks"
 import { booksApi, type BookDetailResponse, type ChapterResponse } from "@/lib/api/books"
+import ApprovalHistoryModal from "./approval-history-modal"
 
 interface BookDetailModalProps {
   bookId: string | null
@@ -178,6 +179,97 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
     )
   }
 
+  const renderApprovalNoteSection = () => {
+    if (!bookDetail?.approval_note) return null
+
+    const currentStatus = bookDetail.approval_status // 0: Pending, 1: Approved, 2: Rejected
+    const lines = bookDetail.approval_note.split('\n').filter(line => line.trim())
+    const totalEntries = lines.length
+    
+    // Get the latest entry for summary
+    const latestEntry = lines[lines.length - 1] || ''
+    
+    let latestType = 'Unknown'
+    let latestMessage = latestEntry
+    let latestColor = 'text-gray-600'
+    let latestBgColor = 'bg-gray-50 dark:bg-gray-900/20'
+    let latestBorderColor = 'border-gray-200 dark:border-gray-800'
+    let latestIcon = MessageSquare
+
+    if (latestEntry.includes('[APPROVED')) {
+      latestType = 'Đã duyệt'
+      latestMessage = latestEntry.replace(/\[APPROVED[^\]]*\]/, '').trim() || 'Sách đã được phê duyệt'
+      latestColor = 'text-green-600 dark:text-green-400'
+      latestBgColor = 'bg-green-50 dark:bg-green-900/20'
+      latestBorderColor = 'border-green-200 dark:border-green-800'
+      latestIcon = CheckCircle
+    } else if (latestEntry.includes('[REJECTED')) {
+      latestType = 'Từ chối'
+      latestMessage = latestEntry.replace(/\[REJECTED[^\]]*\]/, '').trim() || 'Sách bị từ chối'
+      latestColor = 'text-red-600 dark:text-red-400'
+      latestBgColor = 'bg-red-50 dark:bg-red-900/20'
+      latestBorderColor = 'border-red-200 dark:border-red-800'
+      latestIcon = AlertCircle
+    } else if (latestEntry.includes('[RESUBMITTED')) {
+      latestType = 'Resubmit'
+      latestMessage = latestEntry.replace(/\[RESUBMITTED[^\]]*\]/, '').trim() || 'Đã gửi lại để phê duyệt'
+      latestColor = 'text-blue-600 dark:text-blue-400'
+      latestBgColor = 'bg-blue-50 dark:bg-blue-900/20'
+      latestBorderColor = 'border-blue-200 dark:border-blue-800'
+      latestIcon = RotateCw
+    }
+
+    const LatestIcon = latestIcon
+      
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="font-medium flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Lịch sử phê duyệt
+          </h4>
+          <ApprovalHistoryModal
+            bookTitle={bookDetail.title}
+            approvalNote={bookDetail.approval_note}
+            currentStatus={currentStatus}
+          />
+        </div>
+        
+        {/* Latest Entry Summary */}
+        <div className={`border rounded-lg p-4 ${latestBgColor} ${latestBorderColor}`}>
+          <div className="flex items-start gap-3">
+            <div className={`mt-0.5 ${latestColor}`}>
+              <LatestIcon className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-2">
+                <Badge variant="outline" className="text-xs">
+                  {latestType}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {totalEntries > 1 ? `${totalEntries} sự kiện` : '1 sự kiện'}
+                </span>
+              </div>
+              <p className={`text-sm leading-relaxed ${
+                latestType === 'Đã duyệt' ? 'text-green-800 dark:text-green-200' :
+                latestType === 'Từ chối' ? 'text-red-800 dark:text-red-200' :
+                latestType === 'Resubmit' ? 'text-blue-800 dark:text-blue-200' :
+                'text-gray-800 dark:text-gray-200'
+              }`}>
+                {latestMessage}
+              </p>
+              {totalEntries > 1 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Và {totalEntries - 1} sự kiện khác trong lịch sử
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
@@ -210,6 +302,12 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
                       {getApprovalStatusBadge(bookDetail.approval_status)}
                       {getStatusBadge(bookDetail.status)}
                       {bookDetail.is_premium && <Badge variant="secondary">Trả phí</Badge>}
+                      {bookDetail.approval_status === 0 && bookDetail.approval_note?.includes("[RESUBMITTED]") && (
+                        <div className="flex items-center gap-1">
+                          <RotateCw className="h-3 w-3 text-blue-500" />
+                          <span className="text-xs text-blue-600 font-medium">Resubmitted</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -297,13 +395,8 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
                 </div>
               )}
 
-              {/* Approval Note */}
-              {bookDetail.approval_note && (
-                <div>
-                  <h4 className="font-medium mb-2">Ghi chú phê duyệt</h4>
-                  <p className="text-sm text-muted-foreground">{bookDetail.approval_note}</p>
-                </div>
-              )}
+              {/* Approval Note with improved styling */}
+              {renderApprovalNoteSection()}
 
               <Separator />
 
@@ -356,7 +449,7 @@ export default function BookDetailModal({ bookId, isOpen, onClose }: BookDetailM
                   <span className="font-medium">Ngày tạo:</span> {formatDate(bookDetail.created_at)}
                 </div>
                 <div>
-                  <span className="font-medium">Cập nhật:</span> {formatDate(bookDetail.modified_at)}
+                  <span className="font-medium">Cập nhật:</span> {formatDate(bookDetail.created_at)}
                 </div>
               </div>
             </div>
