@@ -323,4 +323,17 @@ export const booksApi = {
     // API chỉ trả về Result (success/failure), không có data
     return result
   },
+
+  // Download sách (Admin/Staff)
+  download: async (bookId: string) => {
+    const response = await authFetch(getApiUrl(config.api.books.download(bookId)))
+
+    if (!response.ok) {
+      const result = await response.json()
+      throw new Error(result.message || "Download sách thất bại")
+    }
+
+    // Return blob for file download
+    return response.blob()
+  },
 }
